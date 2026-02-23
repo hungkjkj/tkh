@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Regime Trading Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #fff; padding: 20px; }
+        .control-panel { background: #1e1e1e; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 15px; }
+        input, select, button { padding: 8px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; }
+        button { background: #007bff; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        .dashboard { display: flex; gap: 20px; }
+        .chart-container { flex: 3; background: #1e1e1e; padding: 10px; border-radius: 8px; }
+        .table-container { flex: 1; background: #1e1e1e; padding: 20px; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
+        th { color: #888; font-size: 14px; }
+        .regime-box { padding: 15px; background: #2a2a2a; text-align: center; font-size: 20px; font-weight: bold; border-radius: 8px; color: #00ff88; margin-bottom: 20px; border: 1px solid #00ff88; }
+    </style>
+</head>
+<body>
+
+    <h2>Quant Trading System: Drift - Compression - Expansion</h2>
+
+    <div class="control-panel">
+        <input type="text" id="symbol" value="XAUT/USDT" placeholder="Mã (VD: BTC/USDT)" oninput="this.value = this.value.toUpperCase()">
+        <select id="timeframe">
+            <option value="1s">1 giây</option>
+            <option value="1m">1 Phút</option>
+            <option value="5m">5 Phút</option>
+            <option value="15m" selected>15 Phút</option>
+            <option value="30m">30 Phút</option>
+            <option value="1h">1 Giờ</option>
+            <option value="4h">4 Giờ</option>
+            <option value="1d">1 Ngày</option>
+            <option value="1w">1 Tuần</option>
+            <option value="1M">1 Tháng</option>
+        </select>
+        <input type="number" id="periodA" value="50" title="Cửa sổ A (Context)">
+        <input type="number" id="periodB" value="5" title="Cửa sổ B (Trigger)">
+        <button onclick="fetchData()">CẬP NHẬT DỮ LIỆU</button>
+    </div>
+
+    <select id="zScoreType" class="bg-gray-800 text-yellow-400 font-bold p-2 rounded ml-2 border border-gray-600">
+        <option value="standard">Kênh Standard (Mean/StdDev)</option>
+        <option value="robust">Kênh Robust (Median/MAD)</option>
+    </select>
+
+    <button id="btnToggleVWAP" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded ml-2">
+        👁️ Bật/Tắt VWAP
+    </button>
+
+    <button id="btnTogglePOC" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded ml-2">
+        🎯 Bật/Tắt POC
+    </button>
+
+    <select id="vwapType" class="bg-gray-800 text-purple-400 font-bold p-2 rounded ml-2 border border-gray-600">
+        <option value="daily">VWAP Phiên (Reset theo ngày - Tốt cho Vàng)</option>
+        <option value="continuous">VWAP Neo (Không Reset - Tốt cho Crypto)</option>
+    </select>
+
+    <div class="dashboard">
+        <div class="chart-container">
+            <div id="mainChart" style="height: 600px;"></div>
+        </div>
+
+        <div class="table-container">
+            <div class="regime-box" id="regimeStatus">WAITING...</div>
+            <table>
+                <tr><th>1. Price Location (Z-Score)</th><td id="zScore">-</td></tr>
+                <tr><th>2. Drift (Norm Slope A)</th><td id="normSlope">-</td></tr>
+                <tr><th>3. Efficiency B (Magnitude)</th><td id="efficiencyB">-</td></tr>
+                <tr><th>4. Z-Score Efficiency B vs A</th><td id="zScoreEffB" style="color: #ffaa00; font-weight: bold;">-</td></tr>
+                <tr><th>5. Volume Accel (B/Prev_B)</th><td id="volAccel">-</td></tr>
+                <tr><th>6. Relative Vol (RVOL)</th><td id="rvol">-</td></tr>
+                <tr><th>7. Volatility (%ATR)</th><td id="pctATR">-</td></tr>
+                <tr><th>8. Compression Score</th><td id="compScore">-</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="mt-4 bg-gray-900 border border-purple-500 rounded p-4">
+        <h3 class="text-center text-purple-400 font-bold mb-3 uppercase">Tọa Độ Tác Chiến (15x)</h3>
+        <div class="grid grid-cols-2 gap-4 text-sm">
+            <div class="bg-red-900/30 p-2 rounded border border-red-800">
+                <p class="text-red-400 font-bold mb-1">🔴 SETUP SHORT</p>
+                <p class="text-gray-300">Limit Entry: <span id="entryShort" class="text-white font-mono font-bold">0.00</span></p>
+                <p class="text-gray-300">Stoploss (Void): <span id="slShort" class="text-red-400 font-mono font-bold">0.00</span></p>
+            </div>
+            <div class="bg-green-900/30 p-2 rounded border border-green-800">
+                <p class="text-green-400 font-bold mb-1">🟢 SETUP LONG</p>
+                <p class="text-gray-300">Limit Entry: <span id="entryLong" class="text-white font-mono font-bold">0.00</span></p>
+                <p class="text-gray-300">Stoploss (Void): <span id="slLong" class="text-green-400 font-mono font-bold">0.00</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- TOÁN HỌC ROBUST (KHÁNG NHIỄU) ---
+        function getMedian(values) {
+            if(values.length === 0) return 0;
+            let sorted = [...values].sort((a, b) => a - b);
+            let half = Math.floor(sorted.length / 2);
+            if (sorted.length % 2) return sorted[half];
+            return (sorted[half - 1] + sorted[half]) / 2.0;
+        }
+
+        function getMAD(values, median) {
+            let absDeviations = values.map(v => Math.abs(v - median));
+            return getMedian(absDeviations);
+        }
+
+        // --- THUẬT TOÁN TÌM POC (POINT OF CONTROL) ---
+        function calculatePOC(highs, lows, closes, volumes) {
+            if (!closes || closes.length === 0) return 0;
+
+            // 1. Tìm đỉnh và đáy của toàn bộ biểu đồ hiện tại
+            let minP = Math.min(...lows);
+            let maxP = Math.max(...highs);
+
+            // 2. Chia biểu đồ thành 25 tầng giá (Bins)
+            let numBins = 25;
+            let binSize = (maxP - minP) / numBins;
+            if (binSize === 0) return closes[0];
+
+            let bins = new Array(numBins).fill(0);
+
+            // 3. Phân bổ Volume vào các tầng giá (Dùng Typical Price cho độ chính xác cao)
+            for (let i = 0; i < closes.length; i++) {
+                let typPrice = (highs[i] + lows[i] + closes[i]) / 3;
+                let binIndex = Math.floor((typPrice - minP) / binSize);
+                
+                // Đảm bảo không bị tràn mảng
+                if (binIndex >= numBins) binIndex = numBins - 1;
+                if (binIndex < 0) binIndex = 0;
+                
+                bins[binIndex] += volumes[i];
+            }
+
+            // 4. Tìm tầng giá có Volume to nhất (Chính là POC)
+            let maxVol = 0;
+            let pocIndex = 0;
+            for (let i = 0; i < numBins; i++) {
+                if (bins[i] > maxVol) {
+                    maxVol = bins[i];
+                    pocIndex = i;
+                }
+            }
+
+            // Trả về mức giá ở giữa của cái Tầng chứa POC
+            return minP + (pocIndex * binSize) + (binSize / 2);
+        }
+
+        // Biến trạng thái Tắt/Bật POC
+        let showPOC = true;
+        document.getElementById('btnTogglePOC').addEventListener('click', () => {
+            showPOC = !showPOC;
+            document.getElementById('btnUpdate').click();
+        });
+
+        // --- TÍNH TOÁN VWAP (Đa chế độ: Daily hoặc Continuous) ---
+        function calculateVWAP(prices, volumes, times, vwapType) {
+            let vwapData = [];
+            let cumulativeVol = 0;
+            let cumulativeVolPrice = 0;
+            let currentDay = -1; 
+            
+            for(let i = 0; i < prices.length; i++) {
+                let dateObj = new Date(times[i]);
+                let day = dateObj.getDate();
+
+                // NẾU CHỌN VWAP THEO PHIÊN (DAILY) VÀ SANG NGÀY MỚI -> RESET
+                // Nếu chọn Continuous thì nó sẽ phớt lờ đoạn IF này và cộng dồn tiếp
+                if (vwapType === 'daily' && day !== currentDay) {
+                    cumulativeVol = 0;
+                    cumulativeVolPrice = 0;
+                    currentDay = day;
+                }
+
+                let typPrice = prices[i]; 
+                cumulativeVol += volumes[i];
+                cumulativeVolPrice += typPrice * volumes[i];
+                
+                let currentVWAP = cumulativeVol === 0 ? typPrice : (cumulativeVolPrice / cumulativeVol);
+                vwapData.push(currentVWAP);
+            }
+            return vwapData;
+        }
+
+        // Biến trạng thái để Tắt/Bật đường VWAP trên chart
+        let showVWAP = true; // Mặc định bật luôn cho bác xem
+        document.getElementById('btnToggleVWAP').addEventListener('click', () => {
+            showVWAP = !showVWAP;
+            document.getElementById('btnUpdate').click(); // Bấm nút là tự động vẽ lại Chart
+        });
+
+        async function fetchData() {
+            try {
+                // Chỉ gửi đúng 4 thông số mỏng nhẹ như tờ giấy
+                const payload = {
+                    symbol: document.getElementById('symbol').value,
+                    timeframe: document.getElementById('timeframe').value,
+                    periodA: parseInt(document.getElementById('periodA').value),
+                    periodB: parseInt(document.getElementById('periodB').value)
+                };
+
+                const res = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload) 
+                });
+                
+                const data = await res.json();
+                
+                if(data.error) return alert(data.error);
+
+                updateTable(data.indicators);
+                drawChart(data.chartData, data.regression, payload.periodA, payload.periodB);
+                
+            } catch (error) {
+                console.error("Lỗi trên trình duyệt:", error);
+            }
+        }
+
+        function updateTable(ind) {
+            document.getElementById('regimeStatus').innerText = ind.regime;
+            document.getElementById('zScore').innerText = ind.zScore;
+            document.getElementById('normSlope').innerText = ind.normSlope;
+            document.getElementById('efficiencyB').innerText = ind.efficiencyB;
+            document.getElementById('zScoreEffB').innerText = ind.zScoreEffB;
+            document.getElementById('volAccel').innerText = ind.volAccel;
+            document.getElementById('rvol').innerText = ind.rvol;
+            document.getElementById('pctATR').innerText = ind.pctATR;
+            document.getElementById('compScore').innerText = ind.compScore;
+        }
+
+        function drawChart(ohlcv, reg, periodA, periodB) {
+            const times = ohlcv.map(d => new Date(d[0]));
+            const opens = ohlcv.map(d => d[1]), highs = ohlcv.map(d => d[2]);
+            const lows = ohlcv.map(d => d[3]), closes = ohlcv.map(d => d[4]);
+            const volumes = ohlcv.map(d => d[5]);
+            
+            // SỬA LỖI 1: Khai báo biến prices bằng mảng closes
+            const prices = closes; 
+
+            // Nến Candlestick
+            const traceCandle = { x: times, close: closes, high: highs, low: lows, open: opens, type: 'candlestick', yaxis: 'y', name: 'Price' };
+            
+            // Khối lượng
+            const traceVolume = { x: times, y: volumes, type: 'bar', yaxis: 'y2', name: 'Volume', marker: { color: closes.map((c, i) => c >= opens[i] ? 'rgba(0, 255, 136, 0.5)' : 'rgba(255, 50, 50, 0.5)') }};
+
+            // --- TÍNH TOÁN SAI SỐ ĐỂ LỌC NHIỄU ROBUST ---
+            let residuals = [];
+            for(let i = 0; i < reg.length; i++) {
+                let lineVal = reg.slope * i + reg.intercept;
+                residuals.push(prices[reg.startIdx + i] - lineVal); // prices giờ đã được định nghĩa
+            }
+
+            let medianRes = getMedian(residuals);
+            let madRes = getMAD(residuals, medianRes);
+            let robustStd = 1.4826 * madRes; // Công thức chuyển đổi MAD sang Std của Quỹ
+
+            // Kiểm tra xem bác đang chọn chế độ Standard hay Robust trên màn hình
+            // LƯU Ý: Đảm bảo HTML của bác có thẻ <select id="zScoreType"> nhé!
+            let useRobust = false; 
+            let zScoreElem = document.getElementById('zScoreType');
+            if (zScoreElem) {
+                 useRobust = zScoreElem.value === 'robust';
+            }
+
+            // Chốt thông số Vẽ Kênh
+            let finalIntercept = useRobust ? (reg.intercept + medianRes) : reg.intercept;
+            let finalStd = useRobust ? robustStd : reg.stdA;
+
+            // --- BẮT ĐẦU VẼ KÊNH HỒI QUY (A -> B) ---
+            let regTimesA = [], regValsA = [], regUpperA = [], regLowerA = [];
+            let regTimesB = [], regValsB = [], regUpperB = [], regLowerB = [];
+            let totalLen = times.length - reg.startIdx;
+
+            for(let i = 0; i < totalLen; i++) {
+                let t = times[reg.startIdx + i];
+                let yVal = reg.slope * i + finalIntercept; 
+                let upper = yVal + 2 * finalStd;
+                let lower = yVal - 2 * finalStd;
+
+                if (i < reg.length) {
+                    regTimesA.push(t); regValsA.push(yVal); regUpperA.push(upper); regLowerA.push(lower);
+                }
+                if (i >= reg.length - 1) {
+                    regTimesB.push(t); regValsB.push(yVal); regUpperB.push(upper); regLowerB.push(lower);
+                }
+            }
+
+            // --- TRACES CHO VÙNG A (Màu Cam/Vàng) ---
+            const traceLRA = { x: regTimesA, y: regValsA, type: 'scatter', mode: 'lines', line: { color: 'yellow', width: 2, dash: 'dot' }, hoverinfo: 'none', showlegend: false };
+            const traceUpperA = { x: regTimesA, y: regUpperA, type: 'scatter', mode: 'lines', line: { color: 'rgba(255, 170, 0, 0.4)', width: 1, dash: 'dash' }, hoverinfo: 'none', showlegend: false };
+            const traceLowerA = { x: regTimesA, y: regLowerA, type: 'scatter', mode: 'lines', line: { color: 'rgba(255, 170, 0, 0.4)', width: 1, dash: 'dash' }, fill: 'tonexty', fillcolor: 'rgba(255, 170, 0, 0.05)', hoverinfo: 'none', showlegend: false };
+
+            // --- TRACES CHO VÙNG B (Màu Xanh Lá) ---
+            const traceLRB = { x: regTimesB, y: regValsB, type: 'scatter', mode: 'lines', line: { color: '#00ff00', width: 2, dash: 'dot' }, name: 'Mean (B)' };
+            const traceUpperB = { x: regTimesB, y: regUpperB, type: 'scatter', mode: 'lines', line: { color: 'rgba(0, 255, 0, 0.6)', width: 1, dash: 'dash' }, name: 'Upper +2 Std (B)' };
+            const traceLowerB = { x: regTimesB, y: regLowerB, type: 'scatter', mode: 'lines', line: { color: 'rgba(0, 255, 0, 0.6)', width: 1, dash: 'dash' }, fill: 'tonexty', fillcolor: 'rgba(0, 255, 0, 0.1)', name: 'Lower -2 Std (B)' };
+
+            // --- VẼ ĐƯỜNG VWAP (MÀU TÍM MAGENTA) ---
+            // SỬA LỖI 2: Hàm calculateVWAP giờ đã nhận đúng mảng prices
+            // Đọc xem bác đang chọn loại VWAP nào trên giao diện
+            let vwapTypeElem = document.getElementById('vwapType');
+            let selectedVwapType = vwapTypeElem ? vwapTypeElem.value : 'daily';
+
+            // Gọi hàm và truyền thêm biến selectedVwapType vào
+            let vwapValues = calculateVWAP(prices, volumes, times, selectedVwapType);
+            const traceVWAP = { 
+                x: times, y: vwapValues, 
+                type: 'scatter', mode: 'lines', 
+                line: { color: '#ff00ff', width: 2.5 }, 
+                name: 'VWAP', 
+                visible: showVWAP ? true : 'legendonly' 
+            };
+
+            // --- TÍNH TOÁN VÀ VẼ ĐƯỜNG POC (ĐIỂM KIỂM SOÁT) ---
+            let pocPrice = calculatePOC(highs, lows, closes, volumes);
+            
+            const tracePOC = { 
+                x: [times[0], times[times.length - 1]], // Kẻ một đường ngang từ đầu đến cuối chart
+                y: [pocPrice, pocPrice], 
+                type: 'scatter', 
+                mode: 'lines', 
+                line: { color: '#ffcc00', width: 3, dash: 'solid' }, // Màu Vàng rực rỡ, nét dày
+                name: `POC: ${pocPrice.toFixed(2)}`, 
+                visible: showPOC ? true : 'legendonly' 
+            };
+
+            // KHAI BÁO LAYOUT CHO PLOTLY (Phần này bác bị thiếu)
+            const layout = {
+                paper_bgcolor: '#1e1e1e', plot_bgcolor: '#1e1e1e', font: { color: '#ccc' },
+                margin: { l: 50, r: 50, t: 30, b: 30 },
+                xaxis: { rangeslider: { visible: false } },
+                yaxis: { domain: [0.3, 1] },
+                yaxis2: { domain: [0, 0.2], showticklabels: false },
+                showlegend: false
+            };
+
+            // VẼ CHART CUỐI CÙNG
+            Plotly.newPlot('mainChart', [traceCandle, traceUpperA, traceLowerA, traceLRA, traceUpperB, traceLowerB, traceLRB, traceVWAP, tracePOC, traceVolume], layout);
+
+            // --- CẬP NHẬT TỌA ĐỘ VÀO LỆNH (ENTRY & STOPLOSS TOÁN HỌC) ---
+            if (regUpperB.length > 0 && regLowerB.length > 0) {
+                // Lấy biên độ Kênh Xanh Lá của cây nến HIỆN TẠI (Mới nhất)
+                let latestUpper = regUpperB[regUpperB.length - 1];
+                let latestLower = regLowerB[regLowerB.length - 1];
+
+                // Tính Stoploss Vùng Chân Không = Mép Kênh ± (1.5 * Độ lệch chuẩn Kháng nhiễu)
+                let slShort = latestUpper + (1.5 * finalStd);
+                let slLong = latestLower - (1.5 * finalStd);
+
+                // Đẩy số liệu ra màn hình
+                document.getElementById('entryShort').innerText = latestUpper.toFixed(2);
+                document.getElementById('slShort').innerText = slShort.toFixed(2);
+                document.getElementById('entryLong').innerText = latestLower.toFixed(2);
+                document.getElementById('slLong').innerText = slLong.toFixed(2);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+day 1: Không nên cố bắt đáy, nên có tín hiệu rõ ràng rồi vào, thà ăn ít hơn tí còn hơn là mất tiền.
+
+day 2: đánh thuận xu hướng, hạn chế ngược xu hướng, nếu muốn đánh xu hướng thì yêu cầu khắt khe hơn như độ hấp thụ mạnh, khối lượng thấp, ..... => nói chung hạn chế ngược xu hướng, đặt điểm vào lệnh để tối ưu hóa RR, khi khối lượng càng lớn thì nến càng quét thanh khoản (râu nến) rất láo. Khi khối lượng mạnh thì dù có vào vùng z score lớn thì cũng nên cẩn thận, cần 1 - 2 nến xác nhận., đánh ngược xu thế thì khó lòng ăn tới được z-score 0.
+
+day 3: không nên coi giá đang chạy, chỉ nên tin khi nến đã đóng. Chỉnh xuống frame nhỏ để lấy được chính xác giá trị của POC, POC sẽ bị bỏ lại nếu sau nhiều giờ không chạm (đối với vàng, POC chỉ có tác dụng trong ngày). Còn đổi với bitcoin thì POC sẽ bị bỏ qua **trong ngày đó** nếu như giá chạy khỏe và volume lớn.
+Tuy vậy giá ở dưới POC là 1 mức giá rất tốt để mua.
+Cần đợi giá chọn phe trước rồi mới theo. (phải thật sự mạnh).
+
+lại chết vì đòn bẩy :) 
+5x là đủ rồi làm ơn.........
+chia 25% vốn mỗi lệnh thôi
+đừng dời SL nữa, vào thông minh thì khỏi cần SL.
+Không khớp được lệnh thì cũng không trade tiếp, ..., càng nghĩ cho lệnh sau thì càng ngu.
+thua trận nhỏ để thắng trận lớn.
