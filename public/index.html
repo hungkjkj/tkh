@@ -245,8 +245,8 @@
                 const periodA = parseInt(document.getElementById('periodA').value);
                 const periodB = parseInt(document.getElementById('periodB').value);
                 
-                // Tự động tính số nến cần cào: Tổng Cửa sổ + 100 nến dự phòng
-                const totalCandles = Math.max(2000, periodA + periodB + 100); 
+                // Tự động tính số nến cần cào: Tổng Cửa sổ nến dự phòng
+                const totalCandles = periodA + periodB + periodB;
 
                 console.log(`Đang cào ${totalCandles} nến từ Bybit...`);
                 const rawBybitData = await fetchBybitData(symbol, timeframe, totalCandles);
