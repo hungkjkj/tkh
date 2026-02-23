@@ -43,95 +43,20 @@ const MathLab = {
     }
 };
 
-// --- ĐỘNG CƠ CÀO 2000+ NẾN TỪ BYBIT CHO BACKEND ---
-const axios = require('axios'); // Nhớ phải có dòng này ở tít trên cùng file nhé
-
-async function fetchBybitDataBackend(symbol, interval, totalCandles = 2000) {
-    let cleanSymbol = symbol.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(); 
-
-    const intervalMap = {
-        '1m': '1', '3m': '3', '5m': '5', '15m': '15', '30m': '30',
-        '1h': '60', '2h': '120', '4h': '240', '6h': '360', '12h': '720',
-        '1d': 'D', '1w': 'W', '1M': 'M'
-    };
-    let bybitInterval = intervalMap[interval] || interval;
-    let allKlines = [];
-    let endTime = Date.now();
-    let remaining = totalCandles;
-
-    console.log(`[Backend] Bắt đầu cào ${totalCandles} nến ${cleanSymbol} (${interval}) từ Bybit...`);
-
-    while (remaining > 0) {
-        let currentLimit = Math.min(remaining, 1000); 
-        
-        // LỚP GIÁP 1: Dùng tên miền phụ bytick.com chuyên lách luật Cloudflare
-        let url = `https://api.bytick.com/v5/market/kline?category=linear&symbol=${cleanSymbol}&interval=${bybitInterval}&limit=${currentLimit}&end=${endTime}`;
-        
-        let fetchSuccess = false;
-        let json = null;
-
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-                // LỚP GIÁP 2 & 3: Dùng Axios và Đeo mặt nạ Google Chrome
-                let response = await axios.get(url, { 
-                    timeout: 15000,
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                        'Accept': 'application/json',
-                        'Referer': 'https://www.bybit.com/'
-                    }
-                });
-                
-                json = response.data;
-                fetchSuccess = true; 
-                break; 
-            } catch (error) {
-                console.log(`[Backend] Bị tường lửa chặn lần ${attempt}/3. Đợi 2s thử lại...`);
-                await new Promise(resolve => setTimeout(resolve, 2000)); 
-            }
-        }
-
-        if (!fetchSuccess || json.retCode !== 0 || !json.result || !json.result.list || json.result.list.length === 0) {
-            console.log("[Backend] Thất bại: Bybit không nhả data hoặc bị block hoàn toàn!");
-            break;
-        }
-
-        let data = json.result.list; 
-        data.reverse(); 
-
-        let formattedData = data.map(candle => [
-            parseInt(candle[0]), parseFloat(candle[1]), parseFloat(candle[2]), 
-            parseFloat(candle[3]), parseFloat(candle[4]), parseFloat(candle[5])
-        ]);
-
-        allKlines = formattedData.concat(allKlines);
-        endTime = formattedData[0][0] - 1; 
-        remaining -= data.length;
-        
-        await new Promise(resolve => setTimeout(resolve, 300)); 
-    }
-    
-    console.log(`[Backend] Đã cào xong ${allKlines.length} nến!`);
-    return allKlines;
-}
-
 // --- API TÍNH TOÁN VÀ TRẢ DỮ LIỆU ---
 app.post('/api/analyze', async (req, res) => {
     try {
-        const { symbol, timeframe, periodA, periodB } = req.body;
+        // 1. Nhận data trực tiếp từ Frontend gửi lên
+        const { symbol, timeframe, periodA, periodB, klines } = req.body;
         
-        // Bác muốn bao nhiêu nến thì chỉnh ở đây (ví dụ: 2000)
-        const totalCandles = periodA + periodB + periodB; // Lấy dư thêm 20 nến để đảm bảo đủ dữ liệu cho các chỉ báo dài hạn
+        // 2. Ném nguyên cục data vào rổ ohlcv
+        let ohlcv = klines;
 
-        // 1. Gọi cỗ máy cào data Bybit ngay tại Backend
-        let ohlcv = await fetchBybitDataBackend(symbol, timeframe, totalCandles);
-
-        // 2. Chốt chặn an toàn
         if (!ohlcv || ohlcv.length === 0) {
-            return res.status(400).json({ error: "Backend không cào được dữ liệu từ Bybit!" });
+            return res.status(400).json({ error: "Backend không nhận được nến nào từ Frontend!" });
         }
 
-        // 3. Chém bỏ nến cuối cùng (nến đang chạy) để biểu đồ tĩnh như mặt hồ
+        // 3. Vứt bỏ cây nến chưa đóng
         if (ohlcv.length > 0) {
             ohlcv.pop(); 
         }

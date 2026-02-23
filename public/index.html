@@ -195,31 +195,91 @@
             document.getElementById('btnUpdate').click(); // Bấm nút là tự động vẽ lại Chart
         });
 
+        // Máy xúc data Bybit chạy bằng IP mạng nhà bác
+        async function fetchBybitData(symbol, interval, totalCandles) {
+            let cleanSymbol = symbol.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+            const intervalMap = {
+                '1m': '1', '3m': '3', '5m': '5', '15m': '15', '30m': '30',
+                '1h': '60', '2h': '120', '4h': '240', '6h': '360', '12h': '720',
+                '1d': 'D', '1w': 'W', '1M': 'M'
+            };
+            let bybitInterval = intervalMap[interval] || interval;
+            let allKlines = [];
+            let endTime = Date.now();
+            let remaining = totalCandles;
+
+            while (remaining > 0) {
+                let currentLimit = Math.min(remaining, 1000); 
+                let url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${cleanSymbol}&interval=${bybitInterval}&limit=${currentLimit}&end=${endTime}`;
+
+                try {
+                    let response = await fetch(url);
+                    let json = await response.json();
+
+                    if (json.retCode !== 0 || !json.result || !json.result.list || json.result.list.length === 0) break;
+
+                    let data = json.result.list; 
+                    data.reverse(); 
+
+                    let formattedData = data.map(candle => [
+                        parseInt(candle[0]), parseFloat(candle[1]), parseFloat(candle[2]), 
+                        parseFloat(candle[3]), parseFloat(candle[4]), parseFloat(candle[5])
+                    ]);
+
+                    allKlines = formattedData.concat(allKlines);
+                    endTime = formattedData[0][0] - 1; 
+                    remaining -= data.length;
+                } catch (error) {
+                    console.error("Lỗi cào data ở Frontend:", error);
+                    break;
+                }
+            }
+            return allKlines;
+        }
+
+        // Hàm bấm nút Cập nhật
         async function fetchData() {
             try {
-                // Chỉ gửi đúng 4 thông số mỏng nhẹ như tờ giấy
+                const symbol = document.getElementById('symbol').value;
+                const timeframe = document.getElementById('timeframe').value;
+                const periodA = parseInt(document.getElementById('periodA').value);
+                const periodB = parseInt(document.getElementById('periodB').value);
+                
+                // Tự động tính số nến cần cào: Tổng Cửa sổ + 100 nến dự phòng
+                const totalCandles = Math.max(2000, periodA + periodB + 100); 
+
+                console.log(`Đang cào ${totalCandles} nến từ Bybit...`);
+                const rawBybitData = await fetchBybitData(symbol, timeframe, totalCandles);
+                
+                if (!rawBybitData || rawBybitData.length === 0) {
+                    return alert("Lỗi: Không cào được dữ liệu (Có thể do mạng hoặc sai tên Coin)!");
+                }
+
                 const payload = {
-                    symbol: document.getElementById('symbol').value,
-                    timeframe: document.getElementById('timeframe').value,
-                    periodA: parseInt(document.getElementById('periodA').value),
-                    periodB: parseInt(document.getElementById('periodB').value)
+                    symbol: symbol,
+                    timeframe: timeframe,
+                    periodA: periodA,
+                    periodB: periodB,
+                    klines: rawBybitData // Ném nguyên cục data lên đám mây cho Backend
                 };
 
+                console.log("Đang ném dữ liệu lên mây Render để làm toán...");
                 const res = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload) 
+                    body: JSON.stringify(payload)
                 });
                 
                 const data = await res.json();
                 
-                if(data.error) return alert(data.error);
+                if(data.error) return alert("Lỗi từ Server: " + data.error);
 
                 updateTable(data.indicators);
                 drawChart(data.chartData, data.regression, payload.periodA, payload.periodB);
-                
+                console.log("Tuyệt vời! Chart đã lên hình!");
+
             } catch (error) {
-                console.error("Lỗi trên trình duyệt:", error);
+                console.error("Lỗi:", error);
             }
         }
 
