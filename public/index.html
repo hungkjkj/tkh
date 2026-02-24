@@ -120,7 +120,7 @@
             let maxP = Math.max(...highs);
 
             // 2. Chia biểu đồ thành tầng giá (Bins)
-            let numBins = 25; // Có thể tăng lên 50 hoặc 70 nếu bác muốn các đường này mịn hơn
+            let numBins = 100; // Có thể tăng lên 50 hoặc 70 nếu bác muốn các đường này mịn hơn
             let binSize = (maxP - minP) / numBins;
             if (binSize === 0) return { POC: closes[0], VAH: closes[0], VAL: closes[0] };
 
