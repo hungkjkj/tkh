@@ -84,14 +84,14 @@
         <h3 class="text-center text-purple-400 font-bold mb-3 uppercase">Tọa Độ Tác Chiến (15x)</h3>
         <div class="grid grid-cols-2 gap-4 text-sm">
             <div class="bg-red-900/30 p-2 rounded border border-red-800">
-                <p class="text-red-400 font-bold mb-1">🔴 SETUP SHORT</p>
-                <p class="text-gray-300">Limit Entry: <span id="entryShort" class="text-white font-mono font-bold">0.00</span></p>
-                <p class="text-gray-300">Stoploss (Void): <span id="slShort" class="text-red-400 font-mono font-bold">0.00</span></p>
+                <p class="text-red-400 font-bold mb-1">🔴 CẢNH BÁO ĐỈNH</p>
+                <p class="text-gray-300">Z=3 (Chốt Lời): <span id="z3Upper" class="text-red-400 font-mono font-bold">0.00</span></p>
+                <p class="text-gray-300">Z=2 (Kháng cự): <span id="entryShort" class="text-white font-mono font-bold">0.00</span></p>
             </div>
             <div class="bg-green-900/30 p-2 rounded border border-green-800">
-                <p class="text-green-400 font-bold mb-1">🟢 SETUP LONG</p>
-                <p class="text-gray-300">Limit Entry: <span id="entryLong" class="text-white font-mono font-bold">0.00</span></p>
-                <p class="text-gray-300">Stoploss (Void): <span id="slLong" class="text-green-400 font-mono font-bold">0.00</span></p>
+                <p class="text-green-400 font-bold mb-1">🟢 VÙNG MUA SPOT + FUTURE</p>
+                <p class="text-gray-300">VAL (Sàn nhà): <span id="valLevel" class="text-green-400 font-mono font-bold">0.00</span></p>
+                <p class="text-gray-300">Z=-3 (Bắt Dao): <span id="z3Lower" class="text-red-400 font-mono font-bold">0.00</span></p>
             </div>
         </div>
     </div>
@@ -111,22 +111,23 @@
             return getMedian(absDeviations);
         }
 
-        // --- THUẬT TOÁN TÌM POC (POINT OF CONTROL) ---
-        function calculatePOC(highs, lows, closes, volumes) {
-            if (!closes || closes.length === 0) return 0;
+        // --- THUẬT TOÁN TÌM VOLUME PROFILE (POC, VAH, VAL) ---
+        function calculateVolumeProfile(highs, lows, closes, volumes, valueAreaPct = 0.7) {
+            if (!closes || closes.length === 0) return { POC: 0, VAH: 0, VAL: 0 };
 
             // 1. Tìm đỉnh và đáy của toàn bộ biểu đồ hiện tại
             let minP = Math.min(...lows);
             let maxP = Math.max(...highs);
 
-            // 2. Chia biểu đồ thành 25 tầng giá (Bins)
-            let numBins = 25;
+            // 2. Chia biểu đồ thành tầng giá (Bins)
+            let numBins = 25; // Có thể tăng lên 50 hoặc 70 nếu bác muốn các đường này mịn hơn
             let binSize = (maxP - minP) / numBins;
-            if (binSize === 0) return closes[0];
+            if (binSize === 0) return { POC: closes[0], VAH: closes[0], VAL: closes[0] };
 
             let bins = new Array(numBins).fill(0);
+            let totalVolume = 0;
 
-            // 3. Phân bổ Volume vào các tầng giá (Dùng Typical Price cho độ chính xác cao)
+            // 3. Phân bổ Volume vào các tầng giá (Dùng Typical Price)
             for (let i = 0; i < closes.length; i++) {
                 let typPrice = (highs[i] + lows[i] + closes[i]) / 3;
                 let binIndex = Math.floor((typPrice - minP) / binSize);
@@ -136,6 +137,7 @@
                 if (binIndex < 0) binIndex = 0;
                 
                 bins[binIndex] += volumes[i];
+                totalVolume += volumes[i]; // CỘNG DỒN TỔNG VOLUME
             }
 
             // 4. Tìm tầng giá có Volume to nhất (Chính là POC)
@@ -148,11 +150,37 @@
                 }
             }
 
-            // Trả về mức giá ở giữa của cái Tầng chứa POC
-            return minP + (pocIndex * binSize) + (binSize / 2);
+            // 5. THUẬT TOÁN LAN TỎA TÌM VAH VÀ VAL (Mục tiêu: Đạt 70% Total Volume)
+            let targetVolume = totalVolume * valueAreaPct;
+            let currentVolume = bins[pocIndex]; // Bắt đầu từ tâm POC
+            let lowerIndex = pocIndex;
+            let upperIndex = pocIndex;
+
+            // Vòng lặp so sánh 2 bên, bên nào Volume to hơn thì nuốt bên đó
+            while (currentVolume < targetVolume) {
+                let volBelow = (lowerIndex > 0) ? bins[lowerIndex - 1] : 0;
+                let volAbove = (upperIndex < numBins - 1) ? bins[upperIndex + 1] : 0;
+
+                if (volBelow === 0 && volAbove === 0) break; // Hết dữ liệu để lan tỏa
+
+                if (volAbove >= volBelow) {
+                    upperIndex++;
+                    currentVolume += bins[upperIndex];
+                } else {
+                    lowerIndex--;
+                    currentVolume += bins[lowerIndex];
+                }
+            }
+
+            // 6. Trả về tọa độ chính xác của cả 3 đường dưới dạng Object
+            return {
+                POC: minP + (pocIndex * binSize) + (binSize / 2),
+                VAH: minP + (upperIndex * binSize) + (binSize / 2),
+                VAL: minP + (lowerIndex * binSize) + (binSize / 2)
+            };
         }
 
-        // Biến trạng thái Tắt/Bật POC
+        // Biến trạng thái Tắt/Bật Volume Profile
         let showPOC = true;
         document.getElementById('btnTogglePOC').addEventListener('click', () => {
             showPOC = !showPOC;
@@ -335,7 +363,7 @@
 
             // --- BẮT ĐẦU VẼ KÊNH HỒI QUY (A -> B) ---
             let regTimesA = [], regValsA = [], regUpperA = [], regLowerA = [];
-            let regTimesB = [], regValsB = [], regUpperB = [], regLowerB = [];
+            let regTimesB = [], regValsB = [], regUpperB = [], regLowerB = [], regUpper3B = [], regLower3B = [];
             let totalLen = times.length - reg.startIdx;
 
             for(let i = 0; i < totalLen; i++) {
@@ -344,11 +372,16 @@
                 let upper = yVal + 2 * finalStd;
                 let lower = yVal - 2 * finalStd;
 
+                // THÊM ĐOẠN TÍNH Z=3 NÀY VÀO:
+                let upper3 = yVal + 3 * finalStd;
+                let lower3 = yVal - 3 * finalStd;
+
                 if (i < reg.length) {
                     regTimesA.push(t); regValsA.push(yVal); regUpperA.push(upper); regLowerA.push(lower);
                 }
                 if (i >= reg.length - 1) {
                     regTimesB.push(t); regValsB.push(yVal); regUpperB.push(upper); regLowerB.push(lower);
+                    regUpper3B.push(upper3); regLower3B.push(lower3);
                 }
             }
 
@@ -379,15 +412,48 @@
             };
 
             // --- TÍNH TOÁN VÀ VẼ ĐƯỜNG POC (ĐIỂM KIỂM SOÁT) ---
-            let pocPrice = calculatePOC(highs, lows, closes, volumes);
-            
+            // 1. Gọi hàm để lấy cả 3 tọa độ (POC, VAH, VAL)
+            let vp = calculateVolumeProfile(highs, lows, closes, volumes);
+
+            // 2. Tạo đường POC (Trọng tâm - Màu Vàng chấm bi)
             const tracePOC = { 
-                x: [times[0], times[times.length - 1]], // Kẻ một đường ngang từ đầu đến cuối chart
-                y: [pocPrice, pocPrice], 
-                type: 'scatter', 
-                mode: 'lines', 
-                line: { color: '#ffcc00', width: 3, dash: 'solid' }, // Màu Vàng rực rỡ, nét dày
-                name: `POC: ${pocPrice.toFixed(2)}`, 
+                x: [times[0], times[times.length - 1]], y: [vp.POC, vp.POC], 
+                type: 'scatter', mode: 'lines', 
+                line: { color: '#ffcc00', width: 2, dash: 'solid'}, 
+                name: `POC: ${vp.POC.toFixed(2)}`, 
+                visible: showPOC ? true : 'legendonly' 
+            };
+
+            // 3. Tạo đường VAH (Trần nhà - Màu Đỏ nét đứt)
+            const traceVAH = { 
+                x: [times[0], times[times.length - 1]], y: [vp.VAH, vp.VAH], 
+                type: 'scatter', mode: 'lines', 
+                line: { color: '#ef5350', width: 2, dash: 'dash' }, 
+                name: `VAH: ${vp.VAH.toFixed(2)}`, 
+                visible: showPOC ? true : 'legendonly' 
+            };
+
+            // --- TẠO ĐƯỜNG Z=3 (CẢNH BÁO ĐỎ LÒM) ---
+            const traceUpper3B = { 
+                x: regTimesB, y: regUpper3B, 
+                type: 'scatter', mode: 'lines', 
+                line: { color: '#ff0000', width: 2, dash: 'solid' }, // Đỏ chót, nét liền dày
+                name: 'Z=+3 (FOMO)' 
+            };
+
+            const traceLower3B = { 
+                x: regTimesB, y: regLower3B, 
+                type: 'scatter', mode: 'lines', 
+                line: { color: '#ff0000', width: 2, dash: 'solid' }, // Đỏ chót, nét liền dày
+                name: 'Z=-3 (PANIC)' 
+            };
+
+            // 4. Tạo đường VAL (Sàn nhà/Điểm Mua - Màu Xanh lá nét đứt)
+            const traceVAL = { 
+                x: [times[0], times[times.length - 1]], y: [vp.VAL, vp.VAL], 
+                type: 'scatter', mode: 'lines', 
+                line: { color: '#26a69a', width: 2, dash: 'dash' }, 
+                name: `VAL: ${vp.VAL.toFixed(2)}`, 
                 visible: showPOC ? true : 'legendonly' 
             };
 
@@ -402,7 +468,7 @@
             };
 
             // VẼ CHART CUỐI CÙNG
-            Plotly.newPlot('mainChart', [traceCandle, traceUpperA, traceLowerA, traceLRA, traceUpperB, traceLowerB, traceLRB, traceVWAP, tracePOC, traceVolume], layout);
+            Plotly.newPlot('mainChart', [traceCandle, traceUpperA, traceLowerA, traceLRA, traceUpperB, traceLowerB, traceLRB, traceVWAP, tracePOC, traceVAH, traceVAL, traceUpper3B, traceLower3B, traceVolume], layout);
 
             // --- CẬP NHẬT TỌA ĐỘ VÀO LỆNH (ENTRY & STOPLOSS TOÁN HỌC) ---
             if (regUpperB.length > 0 && regLowerB.length > 0) {
