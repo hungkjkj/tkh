@@ -77,23 +77,10 @@
                 <tr><th>7. Volatility (%ATR)</th><td id="pctATR">-</td></tr>
                 <tr><th>8. Compression Score</th><td id="compScore">-</td></tr>
             </table>
-        </div>
-    </div>
-
-    <div class="mt-4 bg-gray-900 border border-purple-500 rounded p-4">
-        <h3 class="text-center text-purple-400 font-bold mb-3 uppercase">Tọa Độ Tác Chiến (15x)</h3>
-        <div class="grid grid-cols-2 gap-4 text-sm">
-            <div class="bg-red-900/30 p-2 rounded border border-red-800">
-                <p class="text-red-400 font-bold mb-1">🔴 CẢNH BÁO ĐỈNH</p>
-                <p class="text-gray-300">Z=3 (Chốt Lời): <span id="z3Upper" class="text-red-400 font-mono font-bold">0.00</span></p>
-                <p class="text-gray-300">Z=2 (Kháng cự): <span id="entryShort" class="text-white font-mono font-bold">0.00</span></p>
+            <div class="mt-4 bg-gray-800 border border-yellow-600 rounded p-3 text-center">
+                <span class="text-yellow-500 font-bold uppercase text-xs tracking-wider">📡 Order Flow Radar:</span><br/>
+                <span id="absorptionAlert" class="text-gray-400 text-sm">Đang quét dòng chảy lệnh...</span>
             </div>
-            <div class="bg-green-900/30 p-2 rounded border border-green-800">
-                <p class="text-green-400 font-bold mb-1">🟢 VÙNG MUA SPOT + FUTURE</p>
-                <p class="text-gray-300">VAL (Sàn nhà): <span id="valLevel" class="text-green-400 font-mono font-bold">0.00</span></p>
-                <p class="text-gray-300">Z=-3 (Bắt Dao): <span id="z3Lower" class="text-red-400 font-mono font-bold">0.00</span></p>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -338,21 +325,6 @@
             // Khối lượng
             const traceVolume = { x: times, y: volumes, type: 'bar', yaxis: 'y2', name: 'Volume', marker: { color: closes.map((c, i) => c >= opens[i] ? 'rgba(0, 255, 136, 0.5)' : 'rgba(255, 50, 50, 0.5)') }};
 
-            // --- TÍNH TOÁN CVD (CUMULATIVE VOLUME DELTA) MÔ PHỎNG ---
-            let cvdData = [];
-            let currentCVD = 0;
-            for (let i = 0; i < closes.length; i++) {
-                let range = highs[i] - lows[i];
-                let delta = 0;
-                if (range > 0) {
-                    let buyVol = volumes[i] * ((closes[i] - lows[i]) / range);
-                    let sellVol = volumes[i] * ((highs[i] - closes[i]) / range);
-                    delta = buyVol - sellVol;
-                }
-                currentCVD += delta; // Cộng dồn Delta
-                cvdData.push(currentCVD);
-            }
-
             // --- TÍNH TOÁN SAI SỐ ĐỂ LỌC NHIỄU ROBUST ---
             let residuals = [];
             for(let i = 0; i < reg.length; i++) {
@@ -410,18 +382,6 @@
             const traceUpperB = { x: regTimesB, y: regUpperB, type: 'scatter', mode: 'lines', line: { color: 'rgba(0, 255, 0, 0.6)', width: 1, dash: 'dash' }, name: 'Upper +2 Std (B)' };
             const traceLowerB = { x: regTimesB, y: regLowerB, type: 'scatter', mode: 'lines', line: { color: 'rgba(0, 255, 0, 0.6)', width: 1, dash: 'dash' }, fill: 'tonexty', fillcolor: 'rgba(0, 255, 0, 0.1)', name: 'Lower -2 Std (B)' };
 
-
-            // --- TẠO ĐƯỜNG CVD NẰM Ở TRỤC Y SỐ 3 ---
-            const traceCVD = { 
-                x: times, 
-                y: cvdData, 
-                type: 'scatter', 
-                mode: 'lines', 
-                line: { color: '#00ffff', width: 2 }, // Màu xanh lơ (Cyan) cho nổi bật
-                yaxis: 'y3', // Gán vào Panel thứ 3
-                name: 'CVD' 
-            };
-
             // --- VẼ ĐƯỜNG VWAP (MÀU TÍM MAGENTA) ---
             // SỬA LỖI 2: Hàm calculateVWAP giờ đã nhận đúng mảng prices
             // Đọc xem bác đang chọn loại VWAP nào trên giao diện
@@ -441,6 +401,73 @@
             // --- TÍNH TOÁN VÀ VẼ ĐƯỜNG POC (ĐIỂM KIỂM SOÁT) ---
             // 1. Gọi hàm để lấy cả 3 tọa độ (POC, VAH, VAL)
             let vp = calculateVolumeProfile(highs, lows, closes, volumes);
+
+            // --- TÍNH TOÁN CVD (POSITION-BASED MODEL CHUẨN QUANT) ---
+            let cvdData = [];
+            let currentCVD = 0;
+            let deltaArray = []; // Lưu trữ Delta từng cây nến để chạy Radar
+            const epsilon = 1e-8; // Xử lý lỗi Range = 0
+            
+            for (let i = 0; i < closes.length; i++) {
+                let high = highs[i];
+                let low = lows[i];
+                let close = closes[i];
+                let vol = volumes[i];
+                let range = high - low;
+                let delta = 0;
+
+                if (range > epsilon) {
+                    // Logic Quant: Position = (Close - Low) / Range
+                    let position = (close - low) / range;
+                    delta = vol * (2 * position - 1);
+                } else {
+                    // Xử lý nến Gap (1 vạch) an toàn
+                    if (i > 0) {
+                        if (close > closes[i-1]) delta = vol;
+                        else if (close < closes[i-1]) delta = -vol;
+                    }
+                }
+
+                currentCVD += delta;
+                cvdData.push(currentCVD);
+                deltaArray.push(delta); // Đẩy vào mảng để phân tích Hấp thụ
+            }
+
+            // --- RADAR DÒ HẤP THỤ (ABSORPTION DETECTOR) ---
+            let absorptionMsg = "Đang quét dòng chảy lệnh...";
+            let isAbsorption = false;
+            let lookback = 3; // Quét 3 cây nến gần nhất
+
+            if (closes.length >= lookback && typeof vp !== 'undefined') {
+                let recentDeltas = deltaArray.slice(-lookback);
+                let sumDelta = recentDeltas.reduce((a, b) => a + b, 0);
+                let recentLows = lows.slice(-lookback);
+                let minRecentLow = Math.min(...recentLows);
+                let currentClose = closes[closes.length - 1];
+
+                // Tính Volume trung bình 20 nến để đo xem Delta âm có thực sự "Đột biến" không
+                let avgVol = volumes.slice(-20).reduce((a,b)=>a+b,0) / 20;
+
+                // Điều kiện 1: Giá đang cọ xát xung quanh VAL (Biên độ 0.5%)
+                let isNearVAL = minRecentLow <= vp.VAL * 1.005 && currentClose >= vp.VAL * 0.995;
+                
+                // Điều kiện 2: Phe Bán xả hàng cực mạnh (Tổng Delta 3 nến < -1.5 lần Avg Volume)
+                let isHeavySelling = sumDelta < (-avgVol * 1.5);
+
+                if (isNearVAL && isHeavySelling) {
+                    isAbsorption = true;
+                    absorptionMsg = "🔥 CẢNH BÁO: HẤP THỤ BÁN TẠI VAL (BUY LIMIT TƯỜNG DÀY) - CANH LONG!";
+                } else {
+                    absorptionMsg = "✅ Trạng thái dòng tiền bình thường.";
+                }
+            }
+
+            // Đẩy tín hiệu ra giao diện web
+            let radarAlertBox = document.getElementById('absorptionAlert');
+            if(radarAlertBox) {
+                radarAlertBox.innerText = absorptionMsg;
+                radarAlertBox.className = isAbsorption ? "text-yellow-300 font-bold animate-pulse" : "text-gray-400";
+            }
 
             // 2. Tạo đường POC (Trọng tâm - Màu Vàng chấm bi)
             const tracePOC = { 
@@ -484,6 +511,17 @@
                 visible: showPOC ? true : 'legendonly' 
             };
 
+            // --- TẠO ĐƯỜNG CVD NẰM Ở TRỤC Y SỐ 3 ---
+            const traceCVD = { 
+                x: times, 
+                y: cvdData, 
+                type: 'scatter', 
+                mode: 'lines', 
+                line: { color: '#00ffff', width: 2 }, // Màu xanh lơ (Cyan) cho nổi bật
+                yaxis: 'y3', // Gán vào Panel thứ 3
+                name: 'CVD' 
+            };
+
             // KHAI BÁO LAYOUT CHO PLOTLY (CHIA THÀNH 3 PANEL)
             const layout = {
                 paper_bgcolor: '#1e1e1e', plot_bgcolor: '#1e1e1e', font: { color: '#ccc' },
@@ -509,16 +547,6 @@
                 // Lấy biên độ Kênh Xanh Lá của cây nến HIỆN TẠI (Mới nhất)
                 let latestUpper = regUpperB[regUpperB.length - 1];
                 let latestLower = regLowerB[regLowerB.length - 1];
-
-                // Tính Stoploss Vùng Chân Không = Mép Kênh ± (1.5 * Độ lệch chuẩn Kháng nhiễu)
-                let slShort = latestUpper + (1.5 * finalStd);
-                let slLong = latestLower - (1.5 * finalStd);
-
-                // Đẩy số liệu ra màn hình
-                document.getElementById('entryShort').innerText = latestUpper.toFixed(2);
-                document.getElementById('slShort').innerText = slShort.toFixed(2);
-                document.getElementById('entryLong').innerText = latestLower.toFixed(2);
-                document.getElementById('slLong').innerText = slLong.toFixed(2);
             }
         }
     </script>
