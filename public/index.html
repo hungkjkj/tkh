@@ -338,6 +338,21 @@
             // Khối lượng
             const traceVolume = { x: times, y: volumes, type: 'bar', yaxis: 'y2', name: 'Volume', marker: { color: closes.map((c, i) => c >= opens[i] ? 'rgba(0, 255, 136, 0.5)' : 'rgba(255, 50, 50, 0.5)') }};
 
+            // --- TÍNH TOÁN CVD (CUMULATIVE VOLUME DELTA) MÔ PHỎNG ---
+            let cvdData = [];
+            let currentCVD = 0;
+            for (let i = 0; i < closes.length; i++) {
+                let range = highs[i] - lows[i];
+                let delta = 0;
+                if (range > 0) {
+                    let buyVol = volumes[i] * ((closes[i] - lows[i]) / range);
+                    let sellVol = volumes[i] * ((highs[i] - closes[i]) / range);
+                    delta = buyVol - sellVol;
+                }
+                currentCVD += delta; // Cộng dồn Delta
+                cvdData.push(currentCVD);
+            }
+
             // --- TÍNH TOÁN SAI SỐ ĐỂ LỌC NHIỄU ROBUST ---
             let residuals = [];
             for(let i = 0; i < reg.length; i++) {
@@ -394,6 +409,18 @@
             const traceLRB = { x: regTimesB, y: regValsB, type: 'scatter', mode: 'lines', line: { color: '#00ff00', width: 2, dash: 'dot' }, name: 'Mean (B)' };
             const traceUpperB = { x: regTimesB, y: regUpperB, type: 'scatter', mode: 'lines', line: { color: 'rgba(0, 255, 0, 0.6)', width: 1, dash: 'dash' }, name: 'Upper +2 Std (B)' };
             const traceLowerB = { x: regTimesB, y: regLowerB, type: 'scatter', mode: 'lines', line: { color: 'rgba(0, 255, 0, 0.6)', width: 1, dash: 'dash' }, fill: 'tonexty', fillcolor: 'rgba(0, 255, 0, 0.1)', name: 'Lower -2 Std (B)' };
+
+
+            // --- TẠO ĐƯỜNG CVD NẰM Ở TRỤC Y SỐ 3 ---
+            const traceCVD = { 
+                x: times, 
+                y: cvdData, 
+                type: 'scatter', 
+                mode: 'lines', 
+                line: { color: '#00ffff', width: 2 }, // Màu xanh lơ (Cyan) cho nổi bật
+                yaxis: 'y3', // Gán vào Panel thứ 3
+                name: 'CVD' 
+            };
 
             // --- VẼ ĐƯỜNG VWAP (MÀU TÍM MAGENTA) ---
             // SỬA LỖI 2: Hàm calculateVWAP giờ đã nhận đúng mảng prices
@@ -457,18 +484,25 @@
                 visible: showPOC ? true : 'legendonly' 
             };
 
-            // KHAI BÁO LAYOUT CHO PLOTLY (Phần này bác bị thiếu)
+            // KHAI BÁO LAYOUT CHO PLOTLY (CHIA THÀNH 3 PANEL)
             const layout = {
                 paper_bgcolor: '#1e1e1e', plot_bgcolor: '#1e1e1e', font: { color: '#ccc' },
                 margin: { l: 50, r: 50, t: 30, b: 30 },
                 xaxis: { rangeslider: { visible: false } },
-                yaxis: { domain: [0.3, 1] },
-                yaxis2: { domain: [0, 0.2], showticklabels: false },
+                // Chia tỷ lệ màn hình (Domain đi từ 0 đến 1):
+                yaxis: { domain: [0.4, 1], title: 'Price' },                     // Panel 1: Giá chiếm 60% phía trên
+                yaxis2: { domain: [0.2, 0.35], showticklabels: false },          // Panel 2: Volume chiếm 15% ở giữa
+                yaxis3: { domain: [0, 0.15], title: 'CVD', showticklabels: true }, // Panel 3: CVD chiếm 15% dưới cùng
                 showlegend: false
             };
 
             // VẼ CHART CUỐI CÙNG
-            Plotly.newPlot('mainChart', [traceCandle, traceUpperA, traceLowerA, traceLRA, traceUpperB, traceLowerB, traceLRB, traceVWAP, tracePOC, traceVAH, traceVAL, traceUpper3B, traceLower3B, traceVolume], layout);
+            Plotly.newPlot('mainChart', [
+                traceCandle, traceUpperA, traceLowerA, 
+                traceLRA, traceUpperB, traceLowerB, traceLRB, 
+                traceVWAP, tracePOC, traceVAH, traceVAL, traceUpper3B, 
+                traceLower3B, traceCVD, traceVolume, traceCVD
+            ], layout);
 
             // --- CẬP NHẬT TỌA ĐỘ VÀO LỆNH (ENTRY & STOPLOSS TOÁN HỌC) ---
             if (regUpperB.length > 0 && regLowerB.length > 0) {
