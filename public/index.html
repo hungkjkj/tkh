@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Regime Trading Dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦈</text></svg>">
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #fff; padding: 20px; }
@@ -84,6 +85,44 @@
     </div>
 
     <script>
+
+        // --- KHAI BÁO BIẾN ĐỒNG HỒ QUANT ---
+        let updateTimeout = null;
+
+        function scheduleNextUpdate() {
+            // 1. Dọn dẹp báo thức cũ
+            if (updateTimeout) clearTimeout(updateTimeout);
+
+            // 2. Lấy khung giờ hiện tại (giả sử ID thẻ select là 'timeframe')
+            let tfInput = document.getElementById('timeframe');
+            let tfValue = tfInput ? tfInput.value.toString().toUpperCase() : '1';
+            
+            // Quy đổi khung giờ ra Mili-giây
+            let intervalMs = 60000; // Mặc định 1m
+            if (tfValue === '1' || tfValue === '1M') intervalMs = 60000;
+            else if (tfValue === '3' || tfValue === '3M') intervalMs = 3 * 60000;
+            else if (tfValue === '5' || tfValue === '5M') intervalMs = 5 * 60000;
+            else if (tfValue === '15' || tfValue === '15M') intervalMs = 15 * 60000;
+            else if (tfValue === '30' || tfValue === '30M') intervalMs = 30 * 60000;
+            else if (tfValue === '60' || tfValue === '1H') intervalMs = 60 * 60000;
+
+            // 3. THUẬT TOÁN CANH GIỜ CHUẨN XÁC:
+            let now = Date.now();
+            // Tính số mili-giây còn lại cho đến mốc thời gian chia hết cho Khung giờ
+            let msUntilNextClose = intervalMs - (now % intervalMs);
+            
+            // 4. Cộng thêm 2000ms (2 giây) độ trễ an toàn để chờ API của Sàn cập nhật xong
+            let delay = msUntilNextClose + 2000;
+
+            console.log(`⏳ Đồng hồ Quant: Chờ ${Math.round(delay/1000)}s nữa sẽ đón cây nến mới...`);
+
+            // 5. Cài đặt giờ nổ súng
+            updateTimeout = setTimeout(() => {
+                console.log("🔄 Đóng nến! Đang quét Order Flow mới...");
+                fetchData(); // Bóp cò gọi API
+            }, delay);
+        }
+
         // --- TOÁN HỌC ROBUST (KHÁNG NHIỄU) ---
         function getMedian(values) {
             if(values.length === 0) return 0;
@@ -291,6 +330,8 @@
 
                 updateTable(data.indicators);
                 drawChart(data.chartData, data.regression, payload.periodA, payload.periodB);
+                // Cập nhật biểu đồ xong thì lên dây cót cho cây nến tiếp theo
+                scheduleNextUpdate();
                 console.log("Tuyệt vời! Chart đã lên hình!");
 
             } catch (error) {
@@ -462,6 +503,47 @@
                 }
             }
 
+            // --- CẬP NHẬT TIÊU ĐỀ ĐỘNG THEO HIỆU QUẢ WYCKOFF (Z-SCORE vs DELTA) ---
+            if (regUpperA.length > 0 && typeof deltaArray !== 'undefined') {
+                let lastIdx = regUpperA.length - 1;
+                
+                // 1. Lấy Delta và Độ dịch chuyển giá của nến cuối cùng
+                let latestDelta = deltaArray[lastIdx];
+                let priceMove = closes[lastIdx] - opens[lastIdx];
+                
+                // Tránh lỗi chia cho 0
+                if (Math.abs(latestDelta) < epsilon) latestDelta = epsilon; 
+                
+                // 2. Tính Điểm Hiệu Quả
+                // (Tôi dùng log để làm mượt số, vì Volume nó hay nhảy đột biến)
+                let effScore = (priceMove / Math.abs(latestDelta)) * 1000; 
+
+                // 3. Phân loại Hiệu quả (Kém, Bình thường, Cực cao)
+                let effStatus = "😐 BT";
+                if (latestDelta > 0 && priceMove < 0) effStatus = "🟥 Hấp thụ Bán";
+                else if (latestDelta < 0 && priceMove > 0) effStatus = "🟩 Hấp thụ Mua";
+                else if (Math.abs(effScore) > 10) effStatus = "⚡ Trống Thanh Khoản";
+                else if (Math.abs(effScore) < 0.5) effStatus = "⚠️ Kém Hiệu Quả";
+
+                // 4. Lấy ký hiệu Z-Score (Để biết đang ở Trần hay Sàn)
+                let zSign = regUpperA[lastIdx] > 0 ? "📈" : "📉";
+
+                // 5. Lấy ký hiệu CVD (Để biết dòng tiền đang gom hay xả)
+                let cvdSign = deltaArray.slice(-3).reduce((a,b)=>a+b,0) > 0 ? "↗️" : "↘️";
+
+                // 6. TỔNG HỢP TẠO TIÊU ĐỀ ĐỘNG (Ví dụ: [📈+2.1 | 😐 BT] BTCUSD)
+                let tfValue = document.getElementById('timeframe') ? document.getElementById('timeframe').value.toString().toUpperCase() : '1';
+                document.title = `${zSign}${regUpperA[lastIdx].toFixed(1)} | ${effStatus} | ${cvdSign} ${symbol} (${tfValue})`;
+                
+                // Đẩy thông báo ra giao diện Web (chỗ "Order Flow Radar")
+                let effAlertBox = document.getElementById('efficiencyAlert'); // Tạo thêm một ID HTML tên 'efficiencyAlert' nếu muốn
+                if(effAlertBox) {
+                    effAlertBox.innerText = `Lực: ${latestDelta.toFixed(0)} | H.Quả: ${effStatus}`;
+                    // Nhấp nháy nếu Hiệu quả Cực Kém/Cực Cao
+                    effAlertBox.className = Math.abs(effScore) < 0.5 || Math.abs(effScore) > 10 ? "text-red-400 animate-pulse font-bold" : "text-gray-400";
+                }
+            }
+
             // Đẩy tín hiệu ra giao diện web
             let radarAlertBox = document.getElementById('absorptionAlert');
             if(radarAlertBox) {
@@ -534,13 +616,24 @@
                 showlegend: false
             };
 
-            // VẼ CHART CUỐI CÙNG
-            Plotly.newPlot('mainChart', [
-                traceCandle, traceUpperA, traceLowerA, 
-                traceLRA, traceUpperB, traceLowerB, traceLRB, 
-                traceVWAP, tracePOC, traceVAH, traceVAL, traceUpper3B, 
-                traceLower3B, traceCVD, traceVolume, traceCVD
-            ], layout);
+            // --- TỐI ƯU HÓA RENDER CHO ĐIỆN THOẠI (Plotly.react) ---
+            let chartDiv = document.getElementById('mainChart');
+            
+            // Đóng gói toàn bộ nét vẽ vào 1 mảng
+            let plotData = [
+                traceCandle, traceUpperA, traceLowerA, traceLRA, 
+                // traceUpper3B, traceLower3B, (Nếu bác dùng Z=3 thì nhét vào)
+                traceUpperB, traceLowerB, traceLRB, traceVWAP, 
+                tracePOC, traceVAH, traceVAL, traceVolume, traceCVD
+            ];
+
+            if (chartDiv && chartDiv.data) {
+                // Nếu Chart ĐÃ TỒN TẠI -> Dùng .react để cập nhật siêu tốc (Không nháy màn hình)
+                Plotly.react('mainChart', plotData, layout);
+            } else {
+                // Nếu tải lần đầu tiên -> Dùng .newPlot để xây mới
+                Plotly.newPlot('mainChart', plotData, layout);
+            }
 
             // --- CẬP NHẬT TỌA ĐỘ VÀO LỆNH (ENTRY & STOPLOSS TOÁN HỌC) ---
             if (regUpperB.length > 0 && regLowerB.length > 0) {
