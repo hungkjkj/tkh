@@ -477,7 +477,7 @@
             // --- RADAR DÒ HẤP THỤ (ABSORPTION DETECTOR) ---
             let absorptionMsg = "Đang quét dòng chảy lệnh...";
             let isAbsorption = false;
-            let lookback = 3; // Quét 3 cây nến gần nhất
+            let lookback = periodB; // Quét periodB cây nến gần nhất
 
             if (closes.length >= lookback && typeof vp !== 'undefined') {
                 let recentDeltas = deltaArray.slice(-lookback);
@@ -486,14 +486,14 @@
                 let minRecentLow = Math.min(...recentLows);
                 let currentClose = closes[closes.length - 1];
 
-                // Tính Volume trung bình 20 nến để đo xem Delta âm có thực sự "Đột biến" không
-                let avgVol = volumes.slice(-20).reduce((a,b)=>a+b,0) / 20;
+                // Tính Volume trung bình 120 nến để đo xem Delta âm có thực sự "Đột biến" không
+                let avgVol = volumes.slice(-120).reduce((a,b)=>a+b,0) / 120; // Trung bình 120 nến gần nhất (2 giờ nếu nến 1m)
 
                 // Điều kiện 1: Giá đang cọ xát xung quanh VAL (Biên độ 0.5%)
-                let isNearVAL = minRecentLow <= vp.VAL * 1.005 && currentClose >= vp.VAL * 0.995;
+                let isNearVAL = minRecentLow <= vp.VAL * 1.002 && currentClose >= vp.VAL * 0.998;
                 
-                // Điều kiện 2: Phe Bán xả hàng cực mạnh (Tổng Delta 3 nến < -1.5 lần Avg Volume)
-                let isHeavySelling = sumDelta < (-avgVol * 1.5);
+                // Điều kiện 2: Phe Bán xả hàng cực mạnh (Tổng Delta 3 nến < -1.25 lần Avg Volume)
+                let isHeavySelling = sumDelta < (-avgVol * 1.25);
 
                 if (isNearVAL && isHeavySelling) {
                     isAbsorption = true;
