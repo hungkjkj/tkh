@@ -25,7 +25,7 @@
     <h2>Quant Trading System: Drift - Compression - Expansion</h2>
 
     <div class="control-panel">
-        <input type="text" id="symbol" value="XAUT/USDT" placeholder="Mã (VD: BTC/USDT)" oninput="this.value = this.value.toUpperCase()">
+        <input type="text" id="symbol" value="BTC/USDT" placeholder="Mã (VD: BTC/USDT)" oninput="this.value = this.value.toUpperCase()">
         <select id="timeframe">
             <option value="1s">1 giây</option>
             <option value="1m" selected>1 Phút</option>
@@ -38,7 +38,7 @@
             <option value="1w">1 Tuần</option>
             <option value="1M">1 Tháng</option>
         </select>
-        <input type="number" id="periodA" value="2880" title="Cửa sổ A (Context)">
+        <input type="number" id="periodA" value="10000" title="Cửa sổ A (Context)">
         <input type="number" id="periodB" value="400" title="Cửa sổ B (Trigger)">
         <button onclick="fetchData()">CẬP NHẬT DỮ LIỆU</button>
     </div>
@@ -146,7 +146,7 @@
             let maxP = Math.max(...highs);
 
             // 2. Chia biểu đồ thành tầng giá (Bins)
-            let numBins = 150; // Có thể tăng lên nếu bác muốn các đường này mịn hơn
+            let numBins = 100; // Có thể tăng lên nếu bác muốn các đường này mịn hơn
             let binSize = (maxP - minP) / numBins;
             if (binSize === 0) return { POC: closes[0], VAH: closes[0], VAL: closes[0] };
 

@@ -9,6 +9,33 @@ Cần đợi giá chọn phe trước rồi mới theo. (phải thật sự mạ
 lại chết vì đòn bẩy :) 
 5x là đủ rồi làm ơn.........
 chia 25% vốn mỗi lệnh thôi
-đừng dời SL nữa, vào thông minh thì khỏi cần SL.
+đừng dời SL nữa, vào thông minh thì khỏi cần dời SL.
 Không khớp được lệnh thì cũng không trade tiếp, ..., càng nghĩ cho lệnh sau thì càng ngu.
 thua trận nhỏ để thắng trận lớn.
+
+day N: 
+xem tình hình rộng rồi tới bé
+chia lệnh thành nhiểu tảng băng, giá càng tốt thì cho phép đòn bẩy cao hơn xíu, có thể dựa vào các đáy từ quá khứ làm cơ sở vào lệnh (đáy ở khung lớn).
+
+day N+1: 
+
+Phương pháp đánh đang được backtest:
+
+đợi giá phá VAL rồi tích lũy ở phía dưới, đặt lệnh điều kiện ở quanh VAL 
+thời gian tích lũy ở dưới VAL tỉ lệ thuận với mức độ đi xa của giá, thường tích lũy khoảng 1 ngày thì giá có thế phá qua VAH (có thể +50% mỗi lệnh)
+để đoán trong X ngày, dùng tỉ lên 1 : 3 hoặc 1 : 4 có nghĩa là xem nến trong 3X/4X ngày trong quá khứ mới đủ xây dựng nguyên nhân cho X ngày tiếp theo.
+tích lũy ~3 giờ giá biến động ~1000 giá (btc), sau khi tìm hiểu thì hiểu ra rằng cú giảm ngày 23 tháng 2 rồi sau đó có cú tăng mạnh lên trên tầm 1 nửa nến rồi giảm xuống thì đó chính là FVG, vì hiệu quả nổ lực - kết quả quá cao (imbalance) (do thiếu sự tham gia của 1 bên), nên sau đó giá hồi về để fill lại fvg).
+
+=> giá theo 1 hướng mạnh sau đó bật ngược không mạnh bằng và không có tích lũy lâu dài ở đáy thì xác suất cao là FVG và giá chỉ hồi lên khoảng nửa nến rồi theo tiếp hướng cũ.
+
+FVG là 1 cách để có điểm vào lệnh đẹp.
+
+sideway bị quét hai đầu sau đó thì dường như đã cạn thanh khoản bị tích tụ, có thể bỏ qua (thường thanh khoản còn lại ở vùng đó rất ít và dễ dàng bị phá vỡ).
+
+
+
+đang thử nghiệm phương pháp giao dịch mới
+
+
+giá dưới vwap và poc sẽ canh mua khi giá vượt lên trên các vùng sideway ở vùng giá đó.
+dùng vah và val để giúp phán đoán hướng giá. Vượt val/vah thì xác suất thắng sẽ rất cao.
