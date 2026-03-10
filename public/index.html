@@ -84,6 +84,12 @@
             </div>
     </div>
 
+    <a href="./nhatkitrading.txt" target="_blank">
+        <button style="font-weight: bold; background-color: #00ff00; color: #000000; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 0 20px rgba(0, 255, 0, 0.4); transition: 0.3s;">
+            !
+        </button>
+
+    </a>
     <script>
 
         // --- KHAI BÁO BIẾN ĐỒNG HỒ QUANT ---
@@ -138,7 +144,7 @@
         }
 
         // --- THUẬT TOÁN TÌM VOLUME PROFILE (POC, VAH, VAL) ---
-        function calculateVolumeProfile(highs, lows, closes, volumes, valueAreaPct = 0.7) {
+        function calculateVolumeProfile(highs, lows, closes, volumes, valueAreaPct = 0.8) {
             if (!closes || closes.length === 0) return { POC: 0, VAH: 0, VAL: 0 };
 
             // 1. Tìm đỉnh và đáy của toàn bộ biểu đồ hiện tại
@@ -146,7 +152,7 @@
             let maxP = Math.max(...highs);
 
             // 2. Chia biểu đồ thành tầng giá (Bins)
-            let numBins = 100; // Có thể tăng lên nếu bác muốn các đường này mịn hơn
+            let numBins = 150; // Có thể tăng lên nếu bác muốn các đường này mịn hơn
             let binSize = (maxP - minP) / numBins;
             if (binSize === 0) return { POC: closes[0], VAH: closes[0], VAL: closes[0] };
 
