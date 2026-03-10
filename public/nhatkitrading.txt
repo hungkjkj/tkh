@@ -1,3 +1,6 @@
 Phương pháp giao dịch: 
 - chỉ mua/bán khi giá nằm ngoài biên VAH/VAL
-- giá cần nằm ngoài biên ít nhất khoảng 1 ngày sau đó đặt 1 lệnh tại biên đánh theo chiều về biên còn lại. 
+- giá cần:
+  + nằm ngoài biên ít nhất khoảng 1 ngày
+  + hoặc cách biên ít nhất 1 margin đủ lớn (hấp dẫn)
+ sau đó đặt 1 lệnh tại biên đánh theo chiều về biên còn lại. 
