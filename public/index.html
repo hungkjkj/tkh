@@ -39,7 +39,7 @@
             <option value="1M">1 Tháng</option>
         </select>
         <input type="number" id="periodA" value="19263" title="Cửa sổ A (Context)">
-        <input type="number" id="periodB" value="1263" title="Cửa sổ B (Trigger)">
+        <input type="number" id="periodB" value="400" title="Cửa sổ B (Trigger)">
         <button onclick="fetchData()">CẬP NHẬT DỮ LIỆU</button>
     </div>
 
@@ -77,6 +77,7 @@
                 <tr><th>6. Relative Vol (RVOL)</th><td id="rvol">-</td></tr>
                 <tr><th>7. Volatility (%ATR)</th><td id="pctATR">-</td></tr>
                 <tr><th>8. Compression Score</th><td id="compScore">-</td></tr>
+                <tr><th>9. VWAP (Window B)</th><td id="vwapWindowB" style="color: #ff00ff; font-weight: bold; text-shadow: 0 0 5px #ff00ff;">-</td></tr>
             </table>
             <div class="mt-4 bg-gray-800 border border-yellow-600 rounded p-3 text-center">
                 <span class="text-yellow-500 font-bold uppercase text-xs tracking-wider">📡 Order Flow Radar:</span><br/>
@@ -609,6 +610,33 @@
                 yaxis: 'y3', // Gán vào Panel thứ 3
                 name: 'CVD' 
             };
+
+            // =========================================================
+            // --- THUẬT TOÁN: VWAP ĐỘC LẬP CHO CỬA SỔ B (TRIGGER WINDOW) ---
+            // =========================================================
+            let sumVolPriceB = 0;
+            let sumVolB = 0;
+            
+            // Tìm mốc bắt đầu của Cửa sổ B (lấy periodB cây nến cuối cùng)
+            let startIdxB = Math.max(0, times.length - periodB); 
+
+            for (let i = startIdxB; i < times.length; i++) {
+                // Dùng Typical Price (H+L+C)/3 cho độ chính xác tuyệt đối thay vì chỉ dùng Close
+                let typPriceB = (highs[i] + lows[i] + closes[i]) / 3; 
+                sumVolPriceB += typPriceB * volumes[i];
+                sumVolB += volumes[i];
+            }
+
+            // Chống lỗi chia cho 0 nếu đoạn đó không có Volume
+            let vwapB = sumVolB > 0 ? (sumVolPriceB / sumVolB) : 0;
+
+            // Xuất dữ liệu ra cái bảng HTML vừa tạo ở trên
+            let vwapBElem = document.getElementById('vwapWindowB');
+            if (vwapBElem) {
+                // Hiển thị 4 số thập phân để phù hợp với cả Crypto lẫn Vàng
+                vwapBElem.innerText = vwapB.toFixed(4); 
+            }
+            // =========================================================
 
             // KHAI BÁO LAYOUT CHO PLOTLY (CHIA THÀNH 3 PANEL)
             const layout = {
