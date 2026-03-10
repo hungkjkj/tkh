@@ -38,8 +38,8 @@
             <option value="1w">1 Tuần</option>
             <option value="1M">1 Tháng</option>
         </select>
-        <input type="number" id="periodA" value="10000" title="Cửa sổ A (Context)">
-        <input type="number" id="periodB" value="400" title="Cửa sổ B (Trigger)">
+        <input type="number" id="periodA" value="19263" title="Cửa sổ A (Context)">
+        <input type="number" id="periodB" value="1263" title="Cửa sổ B (Trigger)">
         <button onclick="fetchData()">CẬP NHẬT DỮ LIỆU</button>
     </div>
 
@@ -144,7 +144,7 @@
         }
 
         // --- THUẬT TOÁN TÌM VOLUME PROFILE (POC, VAH, VAL) ---
-        function calculateVolumeProfile(highs, lows, closes, volumes, valueAreaPct = 0.8) {
+        function calculateVolumeProfile(highs, lows, closes, volumes, valueAreaPct = 0.75) {
             if (!closes || closes.length === 0) return { POC: 0, VAH: 0, VAL: 0 };
 
             // 1. Tìm đỉnh và đáy của toàn bộ biểu đồ hiện tại
@@ -152,7 +152,7 @@
             let maxP = Math.max(...highs);
 
             // 2. Chia biểu đồ thành tầng giá (Bins)
-            let numBins = 150; // Có thể tăng lên nếu bác muốn các đường này mịn hơn
+            let numBins = 175; // Có thể tăng lên nếu bác muốn các đường này mịn hơn
             let binSize = (maxP - minP) / numBins;
             if (binSize === 0) return { POC: closes[0], VAH: closes[0], VAL: closes[0] };
 
