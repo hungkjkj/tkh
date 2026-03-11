@@ -78,11 +78,8 @@
                 <tr><th>7. Volatility (%ATR)</th><td id="pctATR">-</td></tr>
                 <tr><th>8. Compression Score</th><td id="compScore">-</td></tr>
                 <tr><th>9. VWAP (Window B)</th><td id="vwapWindowB" style="color: #ff00ff; font-weight: bold; text-shadow: 0 0 5px #ff00ff;">-</td></tr>
+                <tr><th>10. Breakout Margin (heheheh)</th><td id="marginATR" style="color: #00ffcc; font-weight: bold; text-shadow: 0 0 5px #00ffcc;">-</td></tr>
             </table>
-            <div class="mt-4 bg-gray-800 border border-yellow-600 rounded p-3 text-center">
-                <span class="text-yellow-500 font-bold uppercase text-xs tracking-wider">📡 Order Flow Radar:</span><br/>
-                <span id="absorptionAlert" class="text-gray-400 text-sm">Đang quét dòng chảy lệnh...</span>
-            </div>
     </div>
 
     <a href="./nhatkitrading.txt" target="_blank">
@@ -153,7 +150,7 @@
             let maxP = Math.max(...highs);
 
             // 2. Chia biểu đồ thành tầng giá (Bins)
-            let numBins = 175; // Có thể tăng lên nếu bác muốn các đường này mịn hơn
+            let numBins = 200; // Có thể tăng lên nếu bác muốn các đường này mịn hơn
             let binSize = (maxP - minP) / numBins;
             if (binSize === 0) return { POC: closes[0], VAH: closes[0], VAL: closes[0] };
 
@@ -450,66 +447,6 @@
             // 1. Gọi hàm để lấy cả 3 tọa độ (POC, VAH, VAL)
             let vp = calculateVolumeProfile(highs, lows, closes, volumes);
 
-            // --- TÍNH TOÁN CVD (POSITION-BASED MODEL CHUẨN QUANT) ---
-            let cvdData = [];
-            let currentCVD = 0;
-            let deltaArray = []; // Lưu trữ Delta từng cây nến để chạy Radar
-            const epsilon = 1e-8; // Xử lý lỗi Range = 0
-            
-            for (let i = 0; i < closes.length; i++) {
-                let high = highs[i];
-                let low = lows[i];
-                let close = closes[i];
-                let vol = volumes[i];
-                let range = high - low;
-                let delta = 0;
-
-                if (range > epsilon) {
-                    // Logic Quant: Position = (Close - Low) / Range
-                    let position = (close - low) / range;
-                    delta = vol * (2 * position - 1);
-                } else {
-                    // Xử lý nến Gap (1 vạch) an toàn
-                    if (i > 0) {
-                        if (close > closes[i-1]) delta = vol;
-                        else if (close < closes[i-1]) delta = -vol;
-                    }
-                }
-
-                currentCVD += delta;
-                cvdData.push(currentCVD);
-                deltaArray.push(delta); // Đẩy vào mảng để phân tích Hấp thụ
-            }
-
-            // --- RADAR DÒ HẤP THỤ (ABSORPTION DETECTOR) ---
-            let absorptionMsg = "Đang quét dòng chảy lệnh...";
-            let isAbsorption = false;
-            let lookback = periodB; // Quét periodB cây nến gần nhất
-
-            if (closes.length >= lookback && typeof vp !== 'undefined') {
-                let recentDeltas = deltaArray.slice(-lookback);
-                let sumDelta = recentDeltas.reduce((a, b) => a + b, 0);
-                let recentLows = lows.slice(-lookback);
-                let minRecentLow = Math.min(...recentLows);
-                let currentClose = closes[closes.length - 1];
-
-                // Tính Volume trung bình 120 nến để đo xem Delta âm có thực sự "Đột biến" không
-                let avgVol = volumes.slice(-120).reduce((a,b)=>a+b,0) / 120; // Trung bình 120 nến gần nhất (2 giờ nếu nến 1m)
-
-                // Điều kiện 1: Giá đang cọ xát xung quanh VAL (Biên độ 0.5%)
-                let isNearVAL = minRecentLow <= vp.VAL * 1.002 && currentClose >= vp.VAL * 0.998;
-                
-                // Điều kiện 2: Phe Bán xả hàng cực mạnh (Tổng Delta 3 nến < -1.25 lần Avg Volume)
-                let isHeavySelling = sumDelta < (-avgVol * 1.25);
-
-                if (isNearVAL && isHeavySelling) {
-                    isAbsorption = true;
-                    absorptionMsg = "🔥 CẢNH BÁO: HẤP THỤ BÁN TẠI VAL (BUY LIMIT TƯỜNG DÀY) - CANH LONG!";
-                } else {
-                    absorptionMsg = "✅ Trạng thái dòng tiền bình thường.";
-                }
-            }
-
             // --- CẬP NHẬT TIÊU ĐỀ ĐỘNG THEO HIỆU QUẢ WYCKOFF (Z-SCORE vs DELTA) ---
             if (regUpperA.length > 0 && typeof deltaArray !== 'undefined') {
                 let lastIdx = regUpperA.length - 1;
@@ -535,12 +472,9 @@
                 // 4. Lấy ký hiệu Z-Score (Để biết đang ở Trần hay Sàn)
                 let zSign = regUpperA[lastIdx] > 0 ? "📈" : "📉";
 
-                // 5. Lấy ký hiệu CVD (Để biết dòng tiền đang gom hay xả)
-                let cvdSign = deltaArray.slice(-3).reduce((a,b)=>a+b,0) > 0 ? "↗️" : "↘️";
-
                 // 6. TỔNG HỢP TẠO TIÊU ĐỀ ĐỘNG (Ví dụ: [📈+2.1 | 😐 BT] BTCUSD)
                 let tfValue = document.getElementById('timeframe') ? document.getElementById('timeframe').value.toString().toUpperCase() : '1';
-                document.title = `${zSign}${regUpperA[lastIdx].toFixed(1)} | ${effStatus} | ${cvdSign} ${symbol} (${tfValue})`;
+                document.title = `${zSign}${regUpperA[lastIdx].toFixed(1)} | ${effStatus} | ${symbol} (${tfValue})`;
                 
                 // Đẩy thông báo ra giao diện Web (chỗ "Order Flow Radar")
                 let effAlertBox = document.getElementById('efficiencyAlert'); // Tạo thêm một ID HTML tên 'efficiencyAlert' nếu muốn
@@ -549,13 +483,6 @@
                     // Nhấp nháy nếu Hiệu quả Cực Kém/Cực Cao
                     effAlertBox.className = Math.abs(effScore) < 0.5 || Math.abs(effScore) > 10 ? "text-red-400 animate-pulse font-bold" : "text-gray-400";
                 }
-            }
-
-            // Đẩy tín hiệu ra giao diện web
-            let radarAlertBox = document.getElementById('absorptionAlert');
-            if(radarAlertBox) {
-                radarAlertBox.innerText = absorptionMsg;
-                radarAlertBox.className = isAbsorption ? "text-yellow-300 font-bold animate-pulse" : "text-gray-400";
             }
 
             // 2. Tạo đường POC (Trọng tâm - Màu Vàng chấm bi)
@@ -600,17 +527,6 @@
                 visible: showPOC ? true : 'legendonly' 
             };
 
-            // --- TẠO ĐƯỜNG CVD NẰM Ở TRỤC Y SỐ 3 ---
-            const traceCVD = { 
-                x: times, 
-                y: cvdData, 
-                type: 'scatter', 
-                mode: 'lines', 
-                line: { color: '#00ffff', width: 2 }, // Màu xanh lơ (Cyan) cho nổi bật
-                yaxis: 'y3', // Gán vào Panel thứ 3
-                name: 'CVD' 
-            };
-
             // =========================================================
             // --- THUẬT TOÁN: VWAP ĐỘC LẬP CHO CỬA SỔ B (TRIGGER WINDOW) ---
             // =========================================================
@@ -638,6 +554,87 @@
             }
             // =========================================================
 
+
+            // =========================================================
+            // --- THUẬT TOÁN: TỔNG HỢP NẾN 1H TỪ 1M ĐỂ TÍNH ATR 1H ---
+            // =========================================================
+            let hourlyTRs = [];
+            
+            // Xác định tọa độ bắt đầu của Cửa sổ A
+            let startIdxA = Math.max(0, times.length - periodA);
+
+            // Bước nhảy 60 nến (1 giờ = 60 phút)
+            for (let i = startIdxA; i < times.length; i += 60) {
+                // Giới hạn không cho vòng lặp chạy lố mảng ở đoạn cuối
+                let chunkEnd = Math.min(i + 60, times.length);
+                
+                let chunkHigh = -Infinity;
+                let chunkLow = Infinity;
+                let chunkClose = closes[chunkEnd - 1]; // Giá đóng cửa của phút cuối cùng trong khối 1H đó
+                
+                // Quét tìm Đỉnh cao nhất và Đáy thấp nhất trong 60 cây nến 1m này
+                for (let j = i; j < chunkEnd; j++) {
+                    if (highs[j] > chunkHigh) chunkHigh = highs[j];
+                    if (lows[j] < chunkLow) chunkLow = lows[j];
+                }
+                
+                // Tìm giá Đóng cửa của cây nến 1H liền trước (Để tính True Range chuẩn)
+                let prevHourlyClose;
+                if (i === startIdxA) {
+                    // Nếu là giờ đầu tiên, lấy giá đóng cửa của phút ngay trước Cửa sổ A
+                    prevHourlyClose = i > 0 ? closes[i - 1] : chunkClose; 
+                } else {
+                    // Lấy giá đóng cửa của phút cuối cùng của khối 1H trước đó
+                    prevHourlyClose = closes[i - 1]; 
+                }
+
+                // Công thức True Range (TR) áp dụng cho cây nến 1H ảo
+                let tr1 = chunkHigh - chunkLow;
+                let tr2 = Math.abs(chunkHigh - prevHourlyClose);
+                let tr3 = Math.abs(chunkLow - prevHourlyClose);
+                
+                let trueRange = Math.max(tr1, tr2, tr3);
+                hourlyTRs.push(trueRange);
+            }
+
+            // Tính Mean ATR 1H của toàn bộ Cửa sổ A
+            let sumTR_1H = 0;
+            for(let i = 0; i < hourlyTRs.length; i++) {
+                sumTR_1H += hourlyTRs[i];
+            }
+            
+            let meanATR_1H = hourlyTRs.length > 0 ? (sumTR_1H / hourlyTRs.length) : 0;
+            
+            // ... (Phần code tính mảng hourlyTRs và meanATR_1H ở trên giữ nguyên) ...
+
+            // =========================================================
+            // --- THUẬT TOÁN ĐỘT PHÁ: Z-SCORE CỦA ATR (VOLATILITY OF VOLATILITY) ---
+            // =========================================================
+            
+            // 1. Tính Phương sai (Variance) và Độ lệch chuẩn (Standard Deviation) của ATR 1H
+            let sumVarianceATR = 0;
+            for(let i = 0; i < hourlyTRs.length; i++) {
+                // (Giá trị ATR từng giờ - Mean ATR)^2
+                sumVarianceATR += Math.pow(hourlyTRs[i] - meanATR_1H, 2); 
+            }
+            
+            let stdDevATR_1H = hourlyTRs.length > 0 ? Math.sqrt(sumVarianceATR / hourlyTRs.length) : 0;
+            
+            // 2. Thiết lập Z-Score cho Margin (Z = 2.0 nghĩa là Khiên bảo vệ cấp độ 95%)
+            // Bác có thể thay đổi con số 2.0 này thành 2.5 hoặc 3.0 tùy độ "nhát gan"
+            let zScoreATR = 2.0; 
+            
+            // 3. Công thức Margin Bọc Thép
+            let breakoutMargin = meanATR_1H + (zScoreATR * stdDevATR_1H);
+
+            // Xuất dữ liệu ra bảng HTML
+            let marginElem = document.getElementById('marginATR');
+            if (marginElem) {
+                // Hiển thị dạng: Margin (Z=2) để bác dễ theo dõi trên màn hình
+                marginElem.innerText = breakoutMargin.toFixed(5) + " (Z=" + zScoreATR + ")"; 
+            }
+            // =========================================================
+
             // KHAI BÁO LAYOUT CHO PLOTLY (CHIA THÀNH 3 PANEL)
             const layout = {
                 paper_bgcolor: '#1e1e1e', plot_bgcolor: '#1e1e1e', font: { color: '#ccc' },
@@ -645,8 +642,7 @@
                 xaxis: { rangeslider: { visible: false } },
                 // Chia tỷ lệ màn hình (Domain đi từ 0 đến 1):
                 yaxis: { domain: [0.4, 1], title: 'Price' },                     // Panel 1: Giá chiếm 60% phía trên
-                yaxis2: { domain: [0.2, 0.35], showticklabels: false },          // Panel 2: Volume chiếm 15% ở giữa
-                yaxis3: { domain: [0, 0.15], title: 'CVD', showticklabels: true }, // Panel 3: CVD chiếm 15% dưới cùng
+                yaxis2: { domain: [0.0, 0.35], showticklabels: false },          // Panel 2: Volume chiếm 35% ở giữa
                 showlegend: false
             };
 
@@ -658,7 +654,7 @@
                 traceCandle, traceUpperA, traceLowerA, traceLRA, 
                 // traceUpper3B, traceLower3B, (Nếu bác dùng Z=3 thì nhét vào)
                 traceUpperB, traceLowerB, traceLRB, traceVWAP, 
-                tracePOC, traceVAH, traceVAL, traceVolume, traceCVD
+                tracePOC, traceVAH, traceVAL, traceVolume
             ];
 
             if (chartDiv && chartDiv.data) {
