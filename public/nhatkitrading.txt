@@ -1,6 +1,5 @@
-Phương pháp giao dịch: 
-- chỉ mua/bán khi giá nằm ngoài biên VAH/VAL
-- giá cần:
-  + nằm ngoài biên ít nhất khoảng 1 ngày
-  + hoặc cách biên ít nhất 1 margin đủ lớn (hấp dẫn)
- sau đó đặt 1 lệnh tại biên đánh theo chiều về biên còn lại. 
+mọi cú sập/tăng giá đều cần có phần xây dựng nguyên nhân đủ lâu từ trước đó nếu không thì tất cả đều là cú lừa
+
+chỉ bán trên POC/VWAP, chỉ mua dưới POC/VWAP
+
+Dùng margin để tìm điểm vào lệnh hợp lý.
