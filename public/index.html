@@ -38,7 +38,7 @@
             <option value="1w">1 Tuần</option>
             <option value="1M">1 Tháng</option>
         </select>
-        <input type="number" id="periodA" value="9555" title="Cửa sổ A (Context)">
+        <input type="number" id="periodA" value="10000" title="Cửa sổ A (Context)">
         <input type="number" id="periodB" value="600" title="Cửa sổ B (Trigger)">
         <button onclick="fetchData()">CẬP NHẬT DỮ LIỆU</button>
     </div>
@@ -563,16 +563,17 @@
             // Xác định tọa độ bắt đầu của Cửa sổ A
             let startIdxA = Math.max(0, times.length - periodA);
 
-            // Bước nhảy 60 nến (1 giờ = 60 phút)
-            for (let i = startIdxA; i < times.length; i += 60) {
+            // Bước nhảy 120 nến (2 giờ = 120 phút)
+            windowHours = 120;
+            for (let i = startIdxA; i < times.length; i += windowHours) {
                 // Giới hạn không cho vòng lặp chạy lố mảng ở đoạn cuối
-                let chunkEnd = Math.min(i + 60, times.length);
+                let chunkEnd = Math.min(i + windowHours, times.length);
                 
                 let chunkHigh = -Infinity;
                 let chunkLow = Infinity;
                 let chunkClose = closes[chunkEnd - 1]; // Giá đóng cửa của phút cuối cùng trong khối 1H đó
                 
-                // Quét tìm Đỉnh cao nhất và Đáy thấp nhất trong 60 cây nến 1m này
+                // Quét tìm Đỉnh cao nhất và Đáy thấp nhất trong 120 cây nến 1m này
                 for (let j = i; j < chunkEnd; j++) {
                     if (highs[j] > chunkHigh) chunkHigh = highs[j];
                     if (lows[j] < chunkLow) chunkLow = lows[j];
@@ -620,9 +621,9 @@
             
             let stdDevATR_1H = hourlyTRs.length > 0 ? Math.sqrt(sumVarianceATR / hourlyTRs.length) : 0;
             
-            // 2. Thiết lập Z-Score cho Margin (Z = 2.0 nghĩa là Khiên bảo vệ cấp độ 95%)
-            // Bác có thể thay đổi con số 2.0 này thành 2.5 hoặc 3.0 tùy độ "nhát gan"
-            let zScoreATR = 2.0; 
+            // 2. Thiết lập Z-Score cho Margin (Z = 2.5 nghĩa là Khiên bảo vệ cấp độ 99%)
+            // Bác có thể thay đổi con số 2.5 này thành 3.0 hoặc 3.5 tùy độ "nhát gan"
+            let zScoreATR = 2.5; // Mặc định là 2.5, tức là Khiên bảo vệ cấp độ ~99%
             
             // 3. Công thức Margin Bọc Thép
             let breakoutMargin = meanATR_1H + (zScoreATR * stdDevATR_1H);
