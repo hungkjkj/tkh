@@ -1,5 +1,7 @@
-mọi cú sập/tăng giá đều cần có phần xây dựng nguyên nhân đủ lâu từ trước đó nếu không thì tất cả đều là cú lừa
+mọi cú sập/tăng giá đều cần có phần xây dựng nguyên nhân đủ lâu từ trước đó nếu không thì tất cả đều là cú lừa.
 
 phản ứng giá tại các đường vah, val, vwap, poc chính là các dữ liệu quan trọng để phân tích.
 
 Dùng margin để tìm điểm vào lệnh hợp lý.
+
+giá cần chạy mạnh hơn margin thì xác suất breakout thật càng cao.
