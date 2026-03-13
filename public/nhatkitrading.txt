@@ -5,3 +5,5 @@ phản ứng giá tại các đường vah, val, vwap, poc chính là các dữ 
 Dùng margin để tìm điểm vào lệnh hợp lý.
 
 giá cần chạy mạnh hơn margin thì xác suất breakout thật càng cao.
+
+không sợ giá đi ngược nếu đã là true breakout, bởi vì để breakout thì cần lệnh lớn và 1 tổ chức không thể đẩy ngược lại ngay lập tức, cần có sideway để làm được điều đó, (cá mập cũng đang giữ hàng, họ không ngu đẩy ngược mạnh không thì họ cũng lỗ).
