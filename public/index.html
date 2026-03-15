@@ -144,13 +144,40 @@
         function calculateVolumeProfile(highs, lows, closes, volumes, valueAreaPct = 0.75) {
             if (!closes || closes.length === 0) return { POC: 0, VAH: 0, VAL: 0 };
 
-            // 1. Tìm đỉnh và đáy của toàn bộ biểu đồ hiện tại
             let minP = Math.min(...lows);
             let maxP = Math.max(...highs);
+            let priceRange = maxP - minP;
 
-            // 2. Chia biểu đồ thành tầng giá (Bins)
-            let numBins = 75; // Có thể tăng lên nếu bác muốn các đường này mịn hơn
-            let binSize = (maxP - minP) / numBins;
+            // 1. TÍNH ATR CỤC BỘ (Của toàn bộ nến đang hiển thị)
+            let sumTR = 0;
+            // Bỏ qua nến đầu tiên vì không có nến trước đó để so sánh
+            for (let i = 1; i < closes.length; i++) {
+            let tr = Math.max(
+                highs[i] - lows[i],
+                Math.abs(highs[i] - closes[i - 1]),
+                Math.abs(lows[i] - closes[i - 1])
+            );
+            sumTR += tr;
+            }
+            let currentATR = closes.length > 1 ? (sumTR / (closes.length - 1)) : (highs[0] - lows[0]);
+
+            // Rào lỗi nếu thị trường đứng im tuyệt đối (ATR = 0)
+            if (currentATR === 0) currentATR = 1; 
+            const timescale = Math.sqrt(closes.length) / 15; // 
+
+            // 2. Ý TƯỞNG CỦA TRÂM: BIN SIZE DỰA TRÊN ATR CỤC BỘ (ĐỘNG) ĐỂ PHÂN BỐ VOLUME MỘT CÁCH THÔNG MINH HƠN
+
+            let dynamicBinSize = currentATR * timescale; 
+            console.log(`ATR: ${currentATR.toFixed(4)}, Timescale: ${timescale.toFixed(4)}, Bin Size: ${dynamicBinSize.toFixed(4)}`);
+            // 3. TÍNH NUMBINS THEO CÔNG THỨC: RANGE / BIN SIZE
+            let numBins = Math.ceil(priceRange / dynamicBinSize);
+
+            // Rào bảo vệ Trình duyệt (Chống treo máy nếu ATR quá bé sinh ra hàng triệu Bins)
+            if (numBins < 10) numBins = 10;
+            if (numBins > 500) numBins = 500; 
+
+            let binSize = priceRange / numBins;
+
             if (binSize === 0) return { POC: closes[0], VAH: closes[0], VAL: closes[0] };
 
             let bins = new Array(numBins).fill(0);
@@ -252,42 +279,65 @@
             document.getElementById('btnUpdate').click(); // Bấm nút là tự động vẽ lại Chart
         });
 
-        // Máy xúc data Bybit chạy bằng IP mạng nhà bác
-        async function fetchBybitData(symbol, interval, totalCandles) {
+        // Máy xúc data Binance Futures (Thay thế hoàn toàn Bybit)
+        async function fetchBinanceData(symbol, interval, totalCandles) {
+            // Xử lý chuỗi nhập vào: Đổi "BTC/USDT" thành "BTCUSDT" cho đúng chuẩn Binance
             let cleanSymbol = symbol.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+            
+            // Binance hỗ trợ chuẩn các timeframe này
             const intervalMap = {
-                '1m': '1', '3m': '3', '5m': '5', '15m': '15', '30m': '30',
-                '1h': '60', '2h': '120', '4h': '240', '6h': '360', '12h': '720',
-                '1d': 'D', '1w': 'W', '1M': 'M'
+                '1s': '1m', // REST API không có nến 1s, tự động lùi về nến 1m để chống lỗi
+                '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+                '1h': '1h', '4h': '4h', '1d': '1d', '1w': '1w', '1M': '1M'
             };
-            let bybitInterval = intervalMap[interval] || interval;
+            let binanceInterval = intervalMap[interval] || '1m';
+            
             let allKlines = [];
             let endTime = Date.now();
             let remaining = totalCandles;
 
             while (remaining > 0) {
-                let currentLimit = Math.min(remaining, 1000); 
-                let url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${cleanSymbol}&interval=${bybitInterval}&limit=${currentLimit}&end=${endTime}`;
+                // Binance cho phép cào tối đa 1500 nến mỗi lần gọi (Ngon hơn Bybit chỉ cho 1000)
+                let currentLimit = Math.min(remaining, 1500); 
+                
+                // Gọi thẳng vào API Futures (fapi) của Binance
+                let url = `https://fapi.binance.com/fapi/v1/klines?symbol=${cleanSymbol}&interval=${binanceInterval}&limit=${currentLimit}&endTime=${endTime}`;
 
                 try {
                     let response = await fetch(url);
-                    let json = await response.json();
+                    let data = await response.json();
 
-                    if (json.retCode !== 0 || !json.result || !json.result.list || json.result.list.length === 0) break;
+                    // Rào lỗi: Nếu API bị nghẽn hoặc nhập sai mã Coin
+                    if (!data || data.length === 0 || data.code) break;
 
-                    let data = json.result.list; 
-                    data.reverse(); 
+                    let formattedData = data.map(candle => {
+                        let totalVolume = parseFloat(candle[5]);
+                        let takerBuyVolume = parseFloat(candle[9]); // ĐÂY LÀ CHÌA KHÓA VÀNG
+                        
+                        // Toán học tính True Delta:
+                        // Lực Bán = Tổng Vol - Lực Mua
+                        // Delta = Lực Mua - Lực Bán = (2 * Taker Buy) - Tổng Vol
+                        let trueDelta = (2 * takerBuyVolume) - totalVolume;
 
-                    let formattedData = data.map(candle => [
-                        parseInt(candle[0]), parseFloat(candle[1]), parseFloat(candle[2]), 
-                        parseFloat(candle[3]), parseFloat(candle[4]), parseFloat(candle[5])
-                    ]);
+                        // TRẢ VỀ MẢNG: Giữ nguyên index 0->5 để code cũ chạy mượt 100%
+                        return [
+                            parseInt(candle[0]),     // [0] Time
+                            parseFloat(candle[1]),   // [1] Open
+                            parseFloat(candle[2]),   // [2] High
+                            parseFloat(candle[3]),   // [3] Low
+                            parseFloat(candle[4]),   // [4] Close
+                            totalVolume,             // [5] Tổng Volume
+                            trueDelta                // [6] True Delta (Đã tính sẵn cho bác xài)
+                        ];
+                    });
 
                     allKlines = formattedData.concat(allKlines);
+                    
+                    // Lùi thời gian lại 1 mili-giây để cào tiếp vòng lặp lịch sử
                     endTime = formattedData[0][0] - 1; 
                     remaining -= data.length;
                 } catch (error) {
-                    console.error("Lỗi cào data ở Frontend:", error);
+                    console.error("Lỗi cào data Binance:", error);
                     break;
                 }
             }
@@ -306,10 +356,11 @@
                 const totalCandles = periodA + periodB + periodB;
 
                 console.log(`Đang cào ${totalCandles} nến từ Bybit...`);
-                const rawBybitData = await fetchBybitData(symbol, timeframe, totalCandles);
-                
-                if (!rawBybitData || rawBybitData.length === 0) {
-                    return alert("Lỗi: Không cào được dữ liệu (Có thể do mạng hoặc sai tên Coin)!");
+                // Gọi hàm Binance mới
+                const rawBinanceData = await fetchBinanceData(symbol, timeframe, totalCandles);
+                                
+                if (!rawBinanceData || rawBinanceData.length === 0) {
+                    return alert("Lỗi: Không cào được dữ liệu Binance (Sai tên Coin hoặc mất mạng)!");
                 }
 
                 const payload = {
@@ -317,7 +368,7 @@
                     timeframe: timeframe,
                     periodA: periodA,
                     periodB: periodB,
-                    klines: rawBybitData // Ném nguyên cục data lên đám mây cho Backend
+                    klines: rawBinanceData // Ném data Binance lên mây
                 };
 
                 console.log("Đang ném dữ liệu lên mây Render để làm toán...");
@@ -359,15 +410,40 @@
             const opens = ohlcv.map(d => d[1]), highs = ohlcv.map(d => d[2]);
             const lows = ohlcv.map(d => d[3]), closes = ohlcv.map(d => d[4]);
             const volumes = ohlcv.map(d => d[5]);
-            
-            // SỬA LỖI 1: Khai báo biến prices bằng mảng closes
+
+            // --- TÍNH TOÁN TRUE DELTA VÀ CVD ---
+            const deltas = ohlcv.map(d => d[6]); 
+            const deltaArray = deltas; // Giữ lại biến này để hàm đổi Tiêu đề Web bên dưới của bạn không bị lỗi
+
+            let cvdArray = [];
+            let currentCVD = 0;
+            for(let i = 0; i < deltas.length; i++) {
+                currentCVD += deltas[i];
+                cvdArray.push(currentCVD);
+            }
+
             const prices = closes; 
 
-            // Nến Candlestick
+            // --- KHAI BÁO CÁC NÉT VẼ (TRACES) ---
+            // 1. Nến Candlestick
             const traceCandle = { x: times, close: closes, high: highs, low: lows, open: opens, type: 'candlestick', yaxis: 'y', name: 'Price' };
-            
-            // Khối lượng
-            const traceVolume = { x: times, y: volumes, type: 'bar', yaxis: 'y2', name: 'Volume', marker: { color: closes.map((c, i) => c >= opens[i] ? 'rgba(0, 255, 136, 0.5)' : 'rgba(255, 50, 50, 0.5)') }};
+
+            // 2. Cột Volume (Được tô màu siêu xịn: Xanh nếu Delta Dương, Đỏ nếu Delta Âm)
+            const volumeColors = deltas.map(d => d > 0 ? 'rgba(0, 255, 136, 0.6)' : 'rgba(255, 50, 50, 0.6)');
+            const traceVolume = { 
+                x: times, y: volumes, 
+                type: 'bar', yaxis: 'y2', name: 'Volume', 
+                marker: { color: volumeColors }
+            };
+
+            // 3. Đường thẳng CVD (Màu Xanh Lơ / Cyan)
+            const traceCVD = { 
+                x: times, y: cvdArray, 
+                type: 'scatter', mode: 'lines', 
+                yaxis: 'y3', // Đặt vào tầng yaxis số 3
+                name: 'CVD', 
+                line: { color: '#00e5ff', width: 2 } 
+            };
 
             // --- TÍNH TOÁN SAI SỐ ĐỂ LỌC NHIỄU ROBUST ---
             let residuals = [];
@@ -445,9 +521,10 @@
             // --- TÍNH TOÁN VÀ VẼ ĐƯỜNG POC (ĐIỂM KIỂM SOÁT) ---
             // 1. Gọi hàm để lấy cả 3 tọa độ (POC, VAH, VAL)
             let vp = calculateVolumeProfile(highs, lows, closes, volumes);
-
             // --- CẬP NHẬT TIÊU ĐỀ ĐỘNG THEO HIỆU QUẢ WYCKOFF (Z-SCORE vs DELTA) ---
+
             if (regUpperA.length > 0 && typeof deltaArray !== 'undefined') {
+                epsilon = 1e-6; // Hằng số nhỏ để tránh chia cho 0
                 let lastIdx = regUpperA.length - 1;
                 
                 // 1. Lấy Delta và Độ dịch chuyển giá của nến cuối cùng
@@ -640,9 +717,16 @@
                 paper_bgcolor: '#1e1e1e', plot_bgcolor: '#1e1e1e', font: { color: '#ccc' },
                 margin: { l: 50, r: 50, t: 30, b: 30 },
                 xaxis: { rangeslider: { visible: false } },
-                // Chia tỷ lệ màn hình (Domain đi từ 0 đến 1):
-                yaxis: { domain: [0.4, 1], title: 'Price' },                     // Panel 1: Giá chiếm 60% phía trên
-                yaxis2: { domain: [0.0, 0.35], showticklabels: false },          // Panel 2: Volume chiếm 35% ở giữa
+                
+                // Tầng 1: Biểu đồ Giá (Chiếm 55% không gian phía trên)
+                yaxis: { domain: [0.45, 1], title: 'Price' },                     
+                
+                // Tầng 2: Biểu đồ Volume (Chiếm 18% ở giữa)
+                yaxis2: { domain: [0.22, 0.40], showticklabels: false },          
+                
+                // Tầng 3: Biểu đồ CVD (Chiếm 18% không gian dưới cùng)
+                yaxis3: { domain: [0.0, 0.18], title: 'CVD', side: 'right', gridcolor: '#333' },     
+                
                 showlegend: false
             };
 
@@ -654,7 +738,7 @@
                 traceCandle, traceUpperA, traceLowerA, traceLRA, 
                 // traceUpper3B, traceLower3B, (Nếu bác dùng Z=3 thì nhét vào)
                 traceUpperB, traceLowerB, traceLRB, traceVWAP, 
-                tracePOC, traceVAH, traceVAL, traceVolume
+                tracePOC, traceVAH, traceVAL, traceVolume, traceCVD
             ];
 
             if (chartDiv && chartDiv.data) {
