@@ -47,11 +47,11 @@
     </select>
 
     <button id="btnToggleVWAP" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded ml-2">
-        👁️ Bật/Tắt VWAP
+        ZEN
     </button>
 
     <button id="btnTogglePOC" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded ml-2">
-        🎯 Bật/Tắt POC
+        TKH
     </button>
 
     <select id="vwapType" class="bg-gray-800 text-purple-400 font-bold p-2 rounded ml-2 border border-gray-600">
@@ -149,7 +149,7 @@
             let maxP = Math.max(...highs);
 
             // 2. Chia biểu đồ thành tầng giá (Bins)
-            let numBins = 200; // Có thể tăng lên nếu bác muốn các đường này mịn hơn
+            let numBins = 75; // Có thể tăng lên nếu bác muốn các đường này mịn hơn
             let binSize = (maxP - minP) / numBins;
             if (binSize === 0) return { POC: closes[0], VAH: closes[0], VAL: closes[0] };
 
