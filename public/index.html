@@ -39,6 +39,12 @@
         <input type="number" id="periodA" value="10000" title="Cửa sổ A (Context)">
         <input type="number" id="periodB" value="600" title="Cửa sổ B (Trigger)">
         <button onclick="fetchData()">CẬP NHẬT DỮ LIỆU</button>
+        <!-- Nút vào nhật kí -->
+        <button onclick="window.open('./nhatkitrading.txt', '_blank')">NK</button>
+        <!-- Nút vào "heat"-->
+        <button onclick="window.open('https://web.bookmap.com', '_blank')">HEAT</button>
+        <!-- Nút vào wall-hunter.html-->
+        <button onclick="window.open('./wall-hunter.html', '_blank')">W-H</button>
     </div>
 
     <select id="zScoreType" class="bg-gray-800 text-yellow-400 font-bold p-2 rounded ml-2 border border-gray-600">
@@ -80,13 +86,6 @@
             </table>
     </div>
 
-    <a href="./nhatkitrading.txt" target="_blank">
-        <button style="font-weight: bold; background-color: #00ff00; color: #000000; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 0 20px rgba(0, 255, 0, 0.4); transition: 0.3s;">
-            !
-        </button>
-    </a>
-
-    <a href="https://web.bookmap.com" target="_blank">heat</a>
     <script>
 
         // --- KHAI BÁO BIẾN ĐỒNG HỒ QUANT ---
@@ -757,5 +756,6 @@
             }
         }
     </script>
+
 </body>
 </html>

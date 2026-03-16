@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Săn Cá Mập V3 - Time-Series Radar</title>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #121212; color: #fff; padding: 20px; margin: 0; }
+        .control-panel { background: #1e1e1e; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+        .input-group { display: flex; flex-direction: column; gap: 5px; }
+        .input-group label { font-size: 12px; color: #aaa; font-weight: bold; text-transform: uppercase; }
+        input, select, button { padding: 8px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; font-weight: bold; }
+        button { background: #00e5ff; color: #000; cursor: pointer; transition: 0.2s; height: 35px; margin-top: 20px; padding: 0 20px; }
+        button:hover { background: #00b3cc; }
+        
+        .dashboard { display: flex; gap: 20px; }
+        .left-col { flex: 2; display: flex; flex-direction: column; gap: 20px; }
+        .chart-container { background: #1e1e1e; padding: 10px; border-radius: 8px; }
+        .info-panel { flex: 1; background: #1e1e1e; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; gap: 20px; }
+        
+        .wall-box { padding: 15px; border-radius: 8px; background: #2a2a2a; border-left: 6px solid; text-align: center; position: relative; }
+        .wall-sell { border-color: #ff3333; box-shadow: 0 0 10px rgba(255, 50, 50, 0.1); }
+        .wall-buy { border-color: #00ff88; box-shadow: 0 0 10px rgba(0, 255, 136, 0.1); }
+        .highlight { font-size: 26px; font-weight: bold; margin: 5px 0; }
+        .sub-text { color: #aaa; font-size: 14px; }
+        
+        .current-price-box { text-align: center; padding: 15px; border: 2px dashed #555; border-radius: 8px; background: #1a1a1a; }
+        .power-bar-bg { width: 100%; height: 12px; background: #444; border-radius: 6px; margin-top: 10px; overflow: hidden; display: flex; }
+        .power-sell { background: #ff3333; height: 100%; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .power-buy { background: #00ff88; height: 100%; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .ma-badge { position: absolute; top: -10px; right: 10px; background: #ffd700; color: #000; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h2 style="margin: 0;">👁️ Kính Xuyên Thấu (Time-Series Anti-Spoofing)</h2>
+        <span style="color: #888; font-size: 14px;">Quét 1000 Level Sổ Lệnh Binance Futures</span>
+    </div>
+    
+    <div class="control-panel">
+        <div class="input-group">
+            <label>Mã Coin</label>
+            <input type="text" id="symbol" value="BTCUSDT" style="width: 100px;">
+        </div>
+        <div class="input-group">
+            <label>Gộp giá ($)</label>
+            <input type="number" id="binSize" value="20" style="width: 80px;" title="Càng to cản càng rõ">
+        </div>
+        <div class="input-group">
+            <label>Tầm quét (+/- %)</label>
+            <input type="number" id="scanRange" value="1.0" step="0.1" style="width: 80px;">
+        </div>
+        <div class="input-group">
+            <label>Độ mượt MA (Lần quét)</label>
+            <input type="number" id="maPeriod" value="20" style="width: 120px;" title="20 lần * 3s = Trung bình 1 phút">
+        </div>
+        <button onclick="startRadar()" id="btnToggle">BẬT RADAR QUÉT (3s/lần)</button>
+    </div>
+
+    <div class="dashboard">
+        <div class="left-col">
+            <div class="chart-container">
+                <div style="text-align: center; color: #888; font-size: 12px; font-weight: bold; margin-bottom: -15px;">BẢN ĐỒ NHIỆT (SNAPSHOT HIỆN TẠI)</div>
+                <div id="snapshotChart" style="height: 350px;"></div>
+            </div>
+            
+            <div class="chart-container">
+                <div style="text-align: center; color: #ffd700; font-size: 12px; font-weight: bold; margin-bottom: -15px;">XU HƯỚNG TƯỜNG TRUNG BÌNH ĐỘNG (ANTI-SPOOFING)</div>
+                <div id="historyChart" style="height: 300px;"></div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <div class="wall-box wall-sell">
+                <div class="ma-badge">Dữ liệu Đã Lọc MA</div>
+                <div style="color: #ff3333; font-weight: bold;">🔴 KHÁNG CỰ TRUNG BÌNH</div>
+                <div class="sub-text" id="microSellZone">Vùng quét: -</div>
+                <div class="highlight" id="maSellVol">0 BTC</div>
+                <div class="sub-text">Tường thô (Có nhiễu): <span id="rawSellVol">0</span> BTC</div>
+            </div>
+
+            <div class="current-price-box">
+                <div style="color: #888; font-size: 12px; font-weight: bold;">GIÁ HIỆN TẠI</div>
+                <div style="color: #00e5ff; font-size: 34px; font-weight: bold; margin: 5px 0;" id="currentPrice">-</div>
+                
+                <div style="font-size: 11px; margin-top: 15px; color: #aaa; text-transform: uppercase;">Cán Cân Sổ Lệnh (Imbalance MA)</div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 5px;">
+                    <span style="color: #ff3333; font-weight: bold;" id="sellPctTxt">50% Bán</span>
+                    <span style="color: #00ff88; font-weight: bold;" id="buyPctTxt">Mua 50%</span>
+                </div>
+                <div class="power-bar-bg">
+                    <div class="power-sell" id="barSell" style="width: 50%;"></div>
+                    <div class="power-buy" id="barBuy" style="width: 50%;"></div>
+                </div>
+            </div>
+
+            <div class="wall-box wall-buy">
+                <div class="ma-badge">Dữ liệu Đã Lọc MA</div>
+                <div style="color: #00ff88; font-weight: bold;">🟢 HỖ TRỢ TRUNG BÌNH</div>
+                <div class="sub-text" id="microBuyZone">Vùng quét: -</div>
+                <div class="highlight" id="maBuyVol">0 BTC</div>
+                <div class="sub-text">Tường thô (Có nhiễu): <span id="rawBuyVol">0</span> BTC</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let radarInterval;
+        let isRunning = false;
+        
+        // BIẾN LƯU TRỮ CHUỖI THỜI GIAN
+        const MAX_HISTORY = 100; // Lưu tối đa 100 điểm trên biểu đồ lịch sử
+        let timeArray = [];
+        let rawBuyArray = [];
+        let rawSellArray = [];
+        let maBuyArray = [];
+        let maSellArray = [];
+
+        function binOrderBook(orders, binSize) {
+            let binned = {};
+            orders.forEach(order => {
+                let price = parseFloat(order[0]);
+                let vol = parseFloat(order[1]);
+                let bin = Math.floor(price / binSize) * binSize;
+                binned[bin] = (binned[bin] || 0) + vol;
+            });
+            return Object.keys(binned).map(k => [parseFloat(k), binned[k]]);
+        }
+
+        // Hàm tính Trung Bình Động (Simple Moving Average)
+        function calculateSMA(arr, period) {
+            if(arr.length === 0) return 0;
+            let sum = 0;
+            let count = Math.min(arr.length, period);
+            for(let i = arr.length - count; i < arr.length; i++) {
+                sum += arr[i];
+            }
+            return sum / count;
+        }
+
+        async function fetchAndAnalyze() {
+            const symbol = document.getElementById('symbol').value.toUpperCase();
+            const binSize = parseFloat(document.getElementById('binSize').value);
+            const scanRangePct = parseFloat(document.getElementById('scanRange').value) / 100;
+            const maPeriod = parseInt(document.getElementById('maPeriod').value);
+
+            try {
+                const res = await fetch(`https://fapi.binance.com/fapi/v1/depth?symbol=${symbol}&limit=1000`);
+                const data = await res.json();
+                if(!data.bids || !data.asks) return;
+
+                const bids = binOrderBook(data.bids, binSize);
+                const asks = binOrderBook(data.asks, binSize);
+
+                const currentPrice = (parseFloat(data.bids[0][0]) + parseFloat(data.asks[0][0])) / 2;
+                document.getElementById('currentPrice').innerText = currentPrice.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1});
+
+                const upperLimit = currentPrice * (1 + scanRangePct);
+                const lowerLimit = currentPrice * (1 - scanRangePct);
+
+                const localAsks = asks.filter(a => a[0] <= upperLimit);
+                const localBids = bids.filter(b => b[0] >= lowerLimit);
+
+                // 1. Tính Tường thô (Raw Volume) hiện tại
+                const rawSellVol = localAsks.reduce((sum, curr) => sum + curr[1], 0);
+                const rawBuyVol = localBids.reduce((sum, curr) => sum + curr[1], 0);
+
+                // 2. Cập nhật mảng lịch sử (Thêm mới, xóa cũ)
+                const now = new Date();
+                timeArray.push(now);
+                rawBuyArray.push(rawBuyVol);
+                rawSellArray.push(rawSellVol);
+
+                if(timeArray.length > MAX_HISTORY) {
+                    timeArray.shift();
+                    rawBuyArray.shift();
+                    rawSellArray.shift();
+                    maBuyArray.shift();
+                    maSellArray.shift();
+                }
+
+                // 3. Tính Giá trị Trung bình (MA)
+                const currentMABuy = calculateSMA(rawBuyArray, maPeriod);
+                const currentMASell = calculateSMA(rawSellArray, maPeriod);
+                maBuyArray.push(currentMABuy);
+                maSellArray.push(currentMASell);
+
+                // 4. Đổ dữ liệu ra Bảng hiển thị
+                document.getElementById('microSellZone').innerText = `Vùng: ${currentPrice.toFixed(0)} - ${upperLimit.toFixed(0)}`;
+                document.getElementById('rawSellVol').innerText = Math.round(rawSellVol).toLocaleString();
+                document.getElementById('maSellVol').innerText = `${Math.round(currentMASell).toLocaleString()} BTC`;
+
+                document.getElementById('microBuyZone').innerText = `Vùng: ${lowerLimit.toFixed(0)} - ${currentPrice.toFixed(0)}`;
+                document.getElementById('rawBuyVol').innerText = Math.round(rawBuyVol).toLocaleString();
+                document.getElementById('maBuyVol').innerText = `${Math.round(currentMABuy).toLocaleString()} BTC`;
+
+                // 5. Tính thanh Imbalance Dựa trên MA (Chống Fake mượt mà)
+                let totalMAVol = currentMASell + currentMABuy;
+                let sellPct = totalMAVol > 0 ? (currentMASell / totalMAVol) * 100 : 50;
+                let buyPct = totalMAVol > 0 ? (currentMABuy / totalMAVol) * 100 : 50;
+                
+                document.getElementById('barSell').style.width = `${sellPct}%`;
+                document.getElementById('barBuy').style.width = `${buyPct}%`;
+                document.getElementById('sellPctTxt').innerText = `${sellPct.toFixed(1)}% BÁN`;
+                document.getElementById('buyPctTxt').innerText = `MUA ${buyPct.toFixed(1)}%`;
+
+                // ================= VẼ CHART 1: SNAPSHOT HIỆN TẠI =================
+                const traceBuySnap = { y: localBids.map(b => b[0]), x: localBids.map(b => b[1]), name: 'Limit Buy', type: 'bar', orientation: 'h', marker: { color: 'rgba(0, 255, 136, 0.7)' } };
+                const traceSellSnap = { y: localAsks.map(a => a[0]), x: localAsks.map(a => a[1]), name: 'Limit Sell', type: 'bar', orientation: 'h', marker: { color: 'rgba(255, 50, 50, 0.7)' } };
+                
+                const layoutSnap = {
+                    paper_bgcolor: '#1e1e1e', plot_bgcolor: '#1e1e1e', font: { color: '#ccc' },
+                    barmode: 'overlay', margin: { l: 60, r: 20, t: 10, b: 30 },
+                    yaxis: { range: [lowerLimit, upperLimit], tickformat: '.0f' }, 
+                    xaxis: { title: 'Khối lượng (BTC)', tickfont: {size: 10} },
+                    showlegend: false,
+                    shapes: [{ type: 'line', x0: 0, x1: 1, xref: 'paper', y0: currentPrice, y1: currentPrice, yref: 'y', line: { color: '#00e5ff', width: 1.5, dash: 'dot' } }]
+                };
+                Plotly.react('snapshotChart', [traceBuySnap, traceSellSnap], layoutSnap);
+
+                // ================= VẼ CHART 2: TIME-SERIES MA =================
+                const traceMABuy = { x: timeArray, y: maBuyArray, name: 'Hỗ Trợ (MA)', type: 'scatter', mode: 'lines', line: { color: '#00ff88', width: 3, shape: 'spline' }, fill: 'tozeroy', fillcolor: 'rgba(0, 255, 136, 0.1)' };
+                const traceMASell = { x: timeArray, y: maSellArray, name: 'Kháng Cự (MA)', type: 'scatter', mode: 'lines', line: { color: '#ff3333', width: 3, shape: 'spline' }, fill: 'tozeroy', fillcolor: 'rgba(255, 50, 50, 0.1)' };
+                
+                const layoutHist = {
+                    paper_bgcolor: '#1e1e1e', plot_bgcolor: '#1e1e1e', font: { color: '#ccc' },
+                    margin: { l: 40, r: 20, t: 10, b: 30 },
+                    yaxis: { title: 'Vol Lọc MA', tickfont: {size: 10} },
+                    xaxis: { tickformat: '%H:%M:%S', tickfont: {size: 10} },
+                    showlegend: true, legend: { orientation: "h", y: 1.1, x: 0.5, xanchor: 'center' }
+                };
+                Plotly.react('historyChart', [traceMABuy, traceMASell], layoutHist);
+
+            } catch(e) { console.error("Lỗi Radar Sổ lệnh:", e); }
+        }
+
+        function startRadar() {
+            let btn = document.getElementById('btnToggle');
+            if(isRunning) {
+                clearInterval(radarInterval);
+                isRunning = false;
+                btn.innerText = "BẬT RADAR QUÉT (3s/lần)";
+                btn.style.background = "#00e5ff";
+            } else {
+                fetchAndAnalyze(); 
+                radarInterval = setInterval(fetchAndAnalyze, 3000); 
+                isRunning = true;
+                btn.innerText = "ĐANG QUÉT (BẤM ĐỂ DỪNG)";
+                btn.style.background = "#ffaa00";
+            }
+        }
+    </script>
+</body>
+</html>
