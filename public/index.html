@@ -26,18 +26,18 @@
         <input type="text" id="symbol" value="BTC/USDT" placeholder="Mã (VD: BTC/USDT)" oninput="this.value = this.value.toUpperCase()">
         <select id="timeframe">
             <option value="1s">1 giây</option>
-            <option value="1m" selected>1 Phút</option>
+            <option value="1m">1 Phút</option>
             <option value="5m">5 Phút</option>
             <option value="15m">15 Phút</option>
             <option value="30m">30 Phút</option>
-            <option value="1h">1 Giờ</option>
+            <option value="1h" selected>1 Giờ</option>
             <option value="4h">4 Giờ</option>
             <option value="1d">1 Ngày</option>
             <option value="1w">1 Tuần</option>
             <option value="1M">1 Tháng</option>
         </select>
-        <input type="number" id="periodA" value="10000" title="Cửa sổ A (Context)">
-        <input type="number" id="periodB" value="600" title="Cửa sổ B (Trigger)">
+        <input type="number" id="periodA" value="165" title="Cửa sổ A (Context)">
+        <input type="number" id="periodB" value="10" title="Cửa sổ B (Trigger)">
         <button onclick="fetchData()">CẬP NHẬT DỮ LIỆU</button>
         <!-- Nút vào nhật kí -->
         <button onclick="window.open('./nhatkitrading.txt', '_blank')">NK</button>
