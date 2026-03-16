@@ -83,6 +83,7 @@
                 <tr><th>8. Compression Score</th><td id="compScore">-</td></tr>
                 <tr><th>9. VWAP (Window B)</th><td id="vwapWindowB" style="color: #ff00ff; font-weight: bold; text-shadow: 0 0 5px #ff00ff;">-</td></tr>
                 <tr><th>10. Breakout Margin (heheheh)</th><td id="marginATR" style="color: #00ffcc; font-weight: bold; text-shadow: 0 0 5px #00ffcc;">-</td></tr>
+                <tr><th>11. Window B Delta (vs Median)</th><td id="cvdRatioB" style="color: #00e5ff; font-weight: bold; text-shadow: 0 0 5px #00e5ff;">-</td></tr>
             </table>
     </div>
 
@@ -609,12 +610,52 @@
             let sumVolB = 0;
             
             // Tìm mốc bắt đầu của Cửa sổ B (lấy periodB cây nến cuối cùng)
-            let startIdxB = Math.max(0, times.length - periodB); 
+            let startIdxB = Math.max(0, times.length - periodB);
+
+
+            // =========================================================
+            // --- THUẬT TOÁN: WINDOW B NORMALIZED DELTA (%) ---
+            // =========================================================
+
+            // 1. Tính Tổng Delta Cửa sổ B bằng 1 phép trừ (O(1))
+            let cvdB = 0;
+            if (startIdxB > 0) {
+                cvdB = cvdArray[cvdArray.length - 1] - cvdArray[startIdxB - 1]; 
+            } else {
+                cvdB = cvdArray[cvdArray.length - 1];
+            }
+
+            // 2. Trích xuất mảng Volume Cửa sổ B và tính TỔNG (Total Volume)
+            let volumesB = volumes.slice(startIdxB); 
+            let totalVolB = volumesB.reduce((sum, vol) => sum + vol, 0);
+
+            if (totalVolB === 0) totalVolB = 1; // Rào lỗi chia cho 0
+
+            // 3. Tính Tỷ lệ Delta % (Delta Ratio)
+            let deltaPctB = (cvdB / totalVolB) * 100;
+
+            // 4. Đổ dữ liệu ra bảng HTML với màu sắc
+            let cvdRatioElem = document.getElementById('cvdRatioB');
+            if (cvdRatioElem) {
+                let arrow = deltaPctB > 0 ? "🔥 MUA ÁP ĐẢO " : "🩸 BÁN ÁP ĐẢO ";
+                let color = deltaPctB > 0 ? "#00ff88" : "#ff3333";
+                
+                // Nếu tỷ lệ dưới 5% thì coi như thị trường đang Sideway/Cân bằng, cho màu xám
+                if (Math.abs(deltaPctB) < 5) {
+                    arrow = "⚖️ CÂN BẰNG ";
+                    color = "#aaaaaa";
+                }
+                
+                cvdRatioElem.innerText = `${arrow} ${Math.abs(deltaPctB).toFixed(2)}% (Vol: ${Math.round(totalVolB)})`;
+                cvdRatioElem.style.color = color;
+                cvdRatioElem.style.textShadow = `0 0 5px ${color}`;
+            }
+            // =========================================================
+
 
             for (let i = startIdxB; i < times.length; i++) {
-                // Dùng Typical Price (H+L+C)/3 cho độ chính xác tuyệt đối thay vì chỉ dùng Close
-                let typPriceB = (highs[i] + lows[i] + closes[i]) / 3; 
-                sumVolPriceB += typPriceB * volumes[i];
+                let typPrice = (highs[i] + lows[i] + closes[i]) / 3;
+                sumVolPriceB += typPrice * volumes[i];
                 sumVolB += volumes[i];
             }
 
