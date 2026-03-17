@@ -8,4 +8,6 @@ giá cần chạy mạnh hơn margin thì xác suất breakout thật càng cao.
 
 không sợ giá đi ngược nếu đã là true breakout, bởi vì để breakout thì cần lệnh lớn và 1 tổ chức không thể đẩy ngược lại ngay lập tức, cần có sideway để làm được điều đó, (cá mập cũng đang giữ hàng, họ không ngu đẩy ngược mạnh không thì họ cũng lỗ).
 
+phân tích từ toàn cảnh đến cục bộ: từ 7->4 ngày để xác định bối cảnh sau đó xem xét khung nhỏ hơn để theo dõi tình hình hiện tại => dự đoán hướng đi và thời điểm vào lệnh.
+
 đóng lệnh trước 9h tối thứ 6 (8h30 là đẹp). 
