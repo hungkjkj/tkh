@@ -140,63 +140,56 @@
             return getMedian(absDeviations);
         }
 
-        // --- THUẬT TOÁN TÌM VOLUME PROFILE (POC, VAH, VAL) ---
+        // --- THUẬT TOÁN TÌM VOLUME PROFILE (POC, VAH, VAL, LVN) ---
         function calculateVolumeProfile(highs, lows, closes, volumes, valueAreaPct = 0.75) {
-            if (!closes || closes.length === 0) return { POC: 0, VAH: 0, VAL: 0 };
+            if (!closes || closes.length === 0) return { POC: 0, VAH: 0, VAL: 0, LVNs: [] };
 
             let minP = Math.min(...lows);
             let maxP = Math.max(...highs);
             let priceRange = maxP - minP;
 
-            // 1. TÍNH ATR CỤC BỘ (Của toàn bộ nến đang hiển thị)
+            // 1. TÍNH ATR CỤC BỘ ĐỂ LÀM MƯỢT POC
             let sumTR = 0;
-            // Bỏ qua nến đầu tiên vì không có nến trước đó để so sánh
             for (let i = 1; i < closes.length; i++) {
-            let tr = Math.max(
-                highs[i] - lows[i],
-                Math.abs(highs[i] - closes[i - 1]),
-                Math.abs(lows[i] - closes[i - 1])
-            );
-            sumTR += tr;
+                let tr = Math.max(
+                    highs[i] - lows[i],
+                    Math.abs(highs[i] - closes[i - 1]),
+                    Math.abs(lows[i] - closes[i - 1])
+                );
+                sumTR += tr;
             }
             let currentATR = closes.length > 1 ? (sumTR / (closes.length - 1)) : (highs[0] - lows[0]);
-
-            // Rào lỗi nếu thị trường đứng im tuyệt đối (ATR = 0)
             if (currentATR === 0) currentATR = 1; 
-            const timescale = Math.sqrt(closes.length) / 15; // 
 
-            // 2. Ý TƯỞNG CỦA TRÂM: BIN SIZE DỰA TRÊN ATR CỤC BỘ (ĐỘNG) ĐỂ PHÂN BỐ VOLUME MỘT CÁCH THÔNG MINH HƠN
-
+            // 2. BIN SIZE ĐỘNG THEO THỜI GIAN VÀ ĐỘ BIẾN ĐỘNG
+            const timescale = Math.sqrt(closes.length) / 15; 
             let dynamicBinSize = currentATR * timescale; 
-            console.log(`ATR: ${currentATR.toFixed(4)}, Timescale: ${timescale.toFixed(4)}, Bin Size: ${dynamicBinSize.toFixed(4)}`);
-            // 3. TÍNH NUMBINS THEO CÔNG THỨC: RANGE / BIN SIZE
+            
+            // TÍNH TOÁN VÀ RÀO BẢO VỆ NUMBINS
             let numBins = Math.ceil(priceRange / dynamicBinSize);
-
-            // Rào bảo vệ Trình duyệt (Chống treo máy nếu ATR quá bé sinh ra hàng triệu Bins)
             if (numBins < 10) numBins = 10;
             if (numBins > 500) numBins = 500; 
 
+            // CHỐT BIN SIZE THỰC TẾ
             let binSize = priceRange / numBins;
-
-            if (binSize === 0) return { POC: closes[0], VAH: closes[0], VAL: closes[0] };
+            if (binSize === 0) return { POC: closes[0], VAH: closes[0], VAL: closes[0], LVNs: [] };
 
             let bins = new Array(numBins).fill(0);
             let totalVolume = 0;
 
-            // 3. Phân bổ Volume vào các tầng giá (Dùng Typical Price)
+            // 3. PHÂN BỔ VOLUME VÀO CÁC TẦNG GIÁ
             for (let i = 0; i < closes.length; i++) {
                 let typPrice = (highs[i] + lows[i] + closes[i]) / 3;
                 let binIndex = Math.floor((typPrice - minP) / binSize);
                 
-                // Đảm bảo không bị tràn mảng
                 if (binIndex >= numBins) binIndex = numBins - 1;
                 if (binIndex < 0) binIndex = 0;
                 
                 bins[binIndex] += volumes[i];
-                totalVolume += volumes[i]; // CỘNG DỒN TỔNG VOLUME
+                totalVolume += volumes[i];
             }
 
-            // 4. Tìm tầng giá có Volume to nhất (Chính là POC)
+            // 4. TÌM POC (Rốn thanh khoản)
             let maxVol = 0;
             let pocIndex = 0;
             for (let i = 0; i < numBins; i++) {
@@ -206,18 +199,17 @@
                 }
             }
 
-            // 5. THUẬT TOÁN LAN TỎA TÌM VAH VÀ VAL (Mục tiêu: Đạt 75% Total Volume)
+            // 5. LAN TỎA TÌM VAH VÀ VAL (Value Area)
             let targetVolume = totalVolume * valueAreaPct;
-            let currentVolume = bins[pocIndex]; // Bắt đầu từ tâm POC
+            let currentVolume = bins[pocIndex]; 
             let lowerIndex = pocIndex;
             let upperIndex = pocIndex;
 
-            // Vòng lặp so sánh 2 bên, bên nào Volume to hơn thì nuốt bên đó
             while (currentVolume < targetVolume) {
                 let volBelow = (lowerIndex > 0) ? bins[lowerIndex - 1] : 0;
                 let volAbove = (upperIndex < numBins - 1) ? bins[upperIndex + 1] : 0;
 
-                if (volBelow === 0 && volAbove === 0) break; // Hết dữ liệu để lan tỏa
+                if (volBelow === 0 && volAbove === 0) break; 
 
                 if (volAbove >= volBelow) {
                     upperIndex++;
@@ -228,11 +220,37 @@
                 }
             }
 
-            // 6. Trả về tọa độ chính xác của cả 3 đường dưới dạng Object
+            // 6. THUẬT TOÁN TÌM LVN (THUNG LŨNG THANH KHOẢN)
+            let lvns = [];
+            let lvnThreshold = maxVol * 0.3; // Ngưỡng: Vol phải bé hơn 30% POC
+
+            for (let i = 2; i < bins.length - 2; i++) {
+                let currentVol = bins[i];
+                
+                if (currentVol < lvnThreshold) {
+                    // Xét Cực tiểu cục bộ (Local Minima)
+                    if (currentVol < bins[i-1] && currentVol <= bins[i-2] &&
+                        currentVol < bins[i+1] && currentVol <= bins[i+2]) {
+                        
+                        // Đồng nhất dùng binSize để tính tọa độ giá chính xác
+                        let lvnPrice = minP + i * binSize + binSize / 2;
+                        lvns.push({ price: lvnPrice, volume: currentVol });
+                    }
+                }
+            }
+
+            // Sắp xếp LVN theo volume tăng dần (Cạn kiệt nhất lên đầu)
+            lvns.sort((a, b) => a.volume - b.volume);
+            
+            // Trích xuất mảng chỉ chứa 3 Tọa độ giá của LVN
+            let topLVNs = lvns.slice(0, 3).map(lvn => lvn.price);
+
+            // 7. TRẢ VỀ TOÀN BỘ CẤU TRÚC
             return {
                 POC: minP + (pocIndex * binSize) + (binSize / 2),
                 VAH: minP + (upperIndex * binSize) + (binSize / 2),
-                VAL: minP + (lowerIndex * binSize) + (binSize / 2)
+                VAL: minP + (lowerIndex * binSize) + (binSize / 2),
+                LVNs: topLVNs
             };
         }
 
@@ -519,8 +537,8 @@
             };
 
             // --- TÍNH TOÁN VÀ VẼ ĐƯỜNG POC (ĐIỂM KIỂM SOÁT) ---
-            // 1. Gọi hàm để lấy cả 3 tọa độ (POC, VAH, VAL)
-            let vp = calculateVolumeProfile(highs, lows, closes, volumes);
+            // 1. Gọi hàm tính toán Volume Profile (Đảm bảo truyền đúng mảng dữ liệu nến của bạn)
+            let vpData = calculateVolumeProfile(highs, lows, closes, volumes);
             // --- CẬP NHẬT TIÊU ĐỀ ĐỘNG THEO HIỆU QUẢ WYCKOFF (Z-SCORE vs DELTA) ---
 
             if (regUpperA.length > 0 && typeof deltaArray !== 'undefined') {
@@ -561,23 +579,40 @@
                 }
             }
 
-            // 2. Tạo đường POC (Trọng tâm - Màu Vàng chấm bi)
-            const tracePOC = { 
-                x: [times[0], times[times.length - 1]], y: [vp.POC, vp.POC], 
-                type: 'scatter', mode: 'lines', 
-                line: { color: '#ffcc00', width: 2, dash: 'solid'}, 
-                name: `POC: ${vp.POC.toFixed(2)}`, 
-                visible: showPOC ? true : 'legendonly' 
-            };
+            // 2. Khởi tạo mảng chứa các đường kẻ (Shapes)
+            let chartShapes = [];
 
-            // 3. Tạo đường VAH (Trần nhà - Màu Đỏ nét đứt)
-            const traceVAH = { 
-                x: [times[0], times[times.length - 1]], y: [vp.VAH, vp.VAH], 
-                type: 'scatter', mode: 'lines', 
-                line: { color: '#ef5350', width: 2, dash: 'dash' }, 
-                name: `VAH: ${vp.VAH.toFixed(2)}`, 
-                visible: showPOC ? true : 'legendonly' 
-            };
+            // --- VẼ POC (Rốn thanh khoản - Đường Vàng nét liền, dày) ---
+            chartShapes.push({
+                type: 'line', x0: 0, x1: 1, xref: 'paper',
+                y0: vpData.POC, y1: vpData.POC, yref: 'y',
+                line: { color: 'gold', width: 2 }
+            });
+
+            // --- VẼ VAH (Biên trên vùng giá trị - Đường Đỏ nét đứt) ---
+            chartShapes.push({
+                type: 'line', x0: 0, x1: 1, xref: 'paper',
+                y0: vpData.VAH, y1: vpData.VAH, yref: 'y',
+                line: { color: 'rgba(255, 50, 50, 0.6)', width: 1.5, dash: 'dash' }
+            });
+
+            // --- VẼ VAL (Biên dưới vùng giá trị - Đường Xanh nét đứt) ---
+            chartShapes.push({
+                type: 'line', x0: 0, x1: 1, xref: 'paper',
+                y0: vpData.VAL, y1: vpData.VAL, yref: 'y',
+                line: { color: 'rgba(0, 255, 136, 0.6)', width: 1.5, dash: 'dash' }
+            });
+
+            // --- VẼ LVN (Các thung lũng tử thần - Đường Xám chấm bi) ---
+            if (vpData.LVNs && vpData.LVNs.length > 0) {
+                vpData.LVNs.forEach(lvnPrice => {
+                    chartShapes.push({
+                        type: 'line', x0: 0, x1: 1, xref: 'paper',
+                        y0: lvnPrice, y1: lvnPrice, yref: 'y',
+                        line: { color: '#FF5F1F', width: 1.5, dash: 'dot' }
+                    });
+                });
+            }
 
             // --- TẠO ĐƯỜNG Z=3 (CẢNH BÁO ĐỎ LÒM) ---
             const traceUpper3B = { 
@@ -592,15 +627,6 @@
                 type: 'scatter', mode: 'lines', 
                 line: { color: '#ff0000', width: 2, dash: 'solid' }, // Đỏ chót, nét liền dày
                 name: 'Z=-3 (PANIC)' 
-            };
-
-            // 4. Tạo đường VAL (Sàn nhà/Điểm Mua - Màu Xanh lá nét đứt)
-            const traceVAL = { 
-                x: [times[0], times[times.length - 1]], y: [vp.VAL, vp.VAL], 
-                type: 'scatter', mode: 'lines', 
-                line: { color: '#26a69a', width: 2, dash: 'dash' }, 
-                name: `VAL: ${vp.VAL.toFixed(2)}`, 
-                visible: showPOC ? true : 'legendonly' 
             };
 
             // =========================================================
@@ -757,7 +783,7 @@
                 paper_bgcolor: '#1e1e1e', plot_bgcolor: '#1e1e1e', font: { color: '#ccc' },
                 margin: { l: 50, r: 50, t: 30, b: 30 },
                 xaxis: { rangeslider: { visible: false } },
-                
+                shapes: chartShapes,
                 // Tầng 1: Biểu đồ Giá (Chiếm 55% không gian phía trên)
                 yaxis: { domain: [0.45, 1], title: 'Price' },                     
                 
@@ -777,8 +803,7 @@
             let plotData = [
                 traceCandle, traceUpperA, traceLowerA, traceLRA, 
                 // traceUpper3B, traceLower3B, (Nếu bác dùng Z=3 thì nhét vào)
-                traceUpperB, traceLowerB, traceLRB, traceVWAP, 
-                tracePOC, traceVAH, traceVAL, traceVolume, traceCVD
+                traceUpperB, traceLowerB, traceLRB, traceVWAP, traceVolume, traceCVD
             ];
 
             if (chartDiv && chartDiv.data) {
