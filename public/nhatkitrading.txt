@@ -1,13 +1,44 @@
-mọi cú sập/tăng giá đều cần có phần xây dựng nguyên nhân đủ lâu từ trước đó nếu không thì tất cả đều là cú lừa.
+=======================================================================
+               SỔ TAY QUANT & ORDER FLOW (Phiên bản: Trâm)
+=======================================================================
 
-phản ứng giá tại các đường vah, val, vwap, poc chính là các dữ liệu quan trọng để phân tích.
+PHẦN 1: XƯƠNG SỐNG WYCKOFF (Bản chất Dòng tiền)
+Thị trường không di chuyển ngẫu nhiên, nó di chuyển từ vùng thanh khoản này sang vùng thanh khoản khác thông qua các pha Hấp thụ.
+- Vùng Tích Lũy (Accumulation): Đi ngang ở đáy. Hấp thụ cạn kiệt lực Bán chủ động (Market Sell). Báo hiệu giá chuẩn bị Bơm (Markup). Cá mập cảm thấy đây không phải đáy tiềm năng để đạp tiếp vì lực Mua chủ động (CVD) quá lớn.
+- Vùng Phân Phối (Distribution): Đi ngang ở đỉnh. Hấp thụ cạn kiệt lực Mua chủ động (Market Buy). Báo hiệu giá chuẩn bị Xả (Markdown).
+- Hiện Tượng Nén Lò Xo (Volume Contraction): Trong một giai đoạn đi ngang (sideway), nếu khối lượng giao dịch cạn kiệt dần, đó là dấu hiệu "sự tĩnh lặng trước cơn bão". Nguồn cung/cầu đã cạn, giá sắp sửa phá vỡ (Breakout) chiếc hộp cấu trúc hiện tại bằng một biến động cực mạnh.
 
-Dùng margin để tìm điểm vào lệnh hợp lý.
+PHẦN 2: ĐO LƯỜNG SỰ KIỆT SỨC & HẤP THỤ (Order Flow)
+Sử dụng công cụ tính % Delta kết hợp Volume để nhìn thấu ruột gan của vùng Sideway.
+- Tiêu chuẩn Hấp Thụ (Cân Bằng Giả): Volume của toàn bộ cửa sổ (Window) cực kỳ LỚN, nhưng Delta Ratio lại rất BÉ (dưới 5% hoặc hiển thị màu Xám).
+  (Ví dụ: Đang ở đỉnh, Volume 200k BTC nhưng Delta Mua chỉ nhỉnh hơn 4%. Chứng tỏ lực Mua đang đâm đầu vào Tường Limit Sell tàng hình).
+- Ngoại lệ cực kỳ quan trọng (Lực đẩy bất thường): Nếu trong vùng Sideway dài, tường Limit cố gắng chặn lại nhưng lực Mua chủ động liên tục dâng cao đột biến -> Tuyệt đối không Short! Cá mập sẽ tự động nhả tường Limit để giá tiếp tục bay lủng nóc.
 
-giá cần chạy mạnh hơn margin thì xác suất breakout thật càng cao.
+PHẦN 3: BẢN ĐỒ THỐNG KÊ (Xác định Điểm Đảo Chiều & SL/TP)
+Sử dụng Thống kê và Volume Profile để thiết lập ma trận giao dịch.
+- Vùng Bóp Cò (Z-Score): Chỉ tìm kiếm cơ hội đảo chiều khi giá nằm ở trạng thái phi lý: Z-Score > +3 (Quá mua cực đại) hoặc Z-Score < -3 (Quá bán cực đại).
+- Thung lũng Chân không (LVN - Low Volume Node): Đường đứt nét. Đây là vùng trượt giá tự do.
+  -> Tác dụng: Đặt Stoploss ngay phía sau LVN. Nếu giá đâm qua đây, cấu trúc gãy hoàn toàn.
+- Rốn Thanh Khoản (POC - Point of Control): Đường màu vàng nét liền. Nơi tập trung dòng tiền lớn nhất.
+  -> Tác dụng: Đặt Take Profit (Chốt lời) tại POC vì "trọng lực" của thị trường luôn kéo giá về lại vùng này.
 
-không sợ giá đi ngược nếu đã là true breakout, bởi vì để breakout thì cần lệnh lớn và 1 tổ chức không thể đẩy ngược lại ngay lập tức, cần có sideway để làm được điều đó, (cá mập cũng đang giữ hàng, họ không ngu đẩy ngược mạnh không thì họ cũng lỗ).
+PHẦN 4: XÁC NHẬN PHÁ VỠ (BREAKOUT) & SĂN BẪY THANH KHOẢN
+Phải dùng Khối Lượng (Volume) để test xem giá phá cấu trúc thật hay giả.
+- Breakout Thật (Đồng thuận): Giá đâm thủng hộp/cản kèm theo Volume tăng vọt và Delta chủ động cực lớn cùng chiều. Thể hiện dòng tiền tổ chức đã chính thức vào việc.
+- Breakout Giả (Fakeout / Trap): Giá trồi ra khỏi hộp nhưng Volume eo uột (không có lực hậu thuẫn), hoặc Volume cực lớn nhưng Delta lại báo "Bị hấp thụ". Đây là lúc râu nến xuất hiện để quét thanh khoản (Stop Hunt) rồi dội ngược lại.
+- Hành động săn bẫy: Bóp cò ngay khi nến đóng cửa rút chân tạo bẫy. Đặt Stoploss ngay dưới/trên râu nến vừa tạo ra. Tỉ lệ R:R ở những lệnh này là tối ưu nhất.
 
-phân tích từ toàn cảnh đến cục bộ: từ 7->4 ngày để xác định bối cảnh sau đó xem xét khung nhỏ hơn để theo dõi tình hình hiện tại => dự đoán hướng đi và thời điểm vào lệnh.
+PHẦN 5: QUẢN LÝ VỐN & KỶ LUẬT THÉP (Quy tắc 1R)
+Tuyệt đối không tính rủi ro bằng số lượng BTC, phải tính bằng tỷ lệ % trên tổng Vốn.
+- Định nghĩa 1R: 1 Điểm Rủi Ro (1R) = 1% Tổng Tài Khoản. 
+  (Ví dụ: Vốn $10,000 -> 1R = $100. Dù cháy lệnh cũng chỉ mất đúng $100).
+- Công thức Đi Lệnh (Position Sizing):
+  Khối lượng đánh (Size) = 1R ($) / Khoảng cách Stoploss ($)
+- Phân bổ Rủi ro Động (Dynamic R) theo chất lượng Setup:
+  + Setup Hạng A+ (Đánh 1R): Z-score > 3, Delta bị hấp thụ rõ rệt, Tường Limit xác nhận, phá vỡ giả (có volume to/rút râu).
+  + Setup Hạng B (Đánh 0.5R): Đạt điều kiện Z-score nhưng chưa có Tường Limit xác nhận hoặc Delta hơi nhiễu.
+  + Setup Hạng C (0R - Bỏ qua): Không có sự phân kỳ giữa Giá và Order Flow. Đứng ngoài quan sát.
 
-đóng lệnh trước 9h tối thứ 6 (8h30 là đẹp). 
+=======================================================================
+"Giao dịch không phải là dự đoán tương lai, giao dịch là phản ứng với xác suất dựa trên dòng tiền hiện tại."
+=======================================================================
