@@ -640,41 +640,64 @@
 
 
             // =========================================================
-            // --- THUẬT TOÁN: WINDOW B NORMALIZED DELTA (%) ---
+            // --- THUẬT TOÁN V2: DYNAMIC NORMALIZED DELTA RATIO ---
             // =========================================================
 
-            // 1. Tính Tổng Delta Cửa sổ B bằng 1 phép trừ (O(1))
-            let cvdB = 0;
-            if (startIdxB > 0) {
-                cvdB = cvdArray[cvdArray.length - 1] - cvdArray[startIdxB - 1]; 
-            } else {
-                cvdB = cvdArray[cvdArray.length - 1];
+            // 1. TÍNH ĐƯỜNG CƠ SỞ (BASELINE): Trung bình độ lớn Delta % của 50 nến trước đó
+            let totalAbsDeltaPct = 0;
+            let validCandles = 0;
+            let lookbackPeriod = Math.min(50, volumes.length); // Bạn có thể chỉnh số 50 này
+
+            for (let i = volumes.length - lookbackPeriod; i < volumes.length; i++) {
+                let prevCvd = i > 0 ? cvdArray[i - 1] : 0;
+                let delta = cvdArray[i] - prevCvd;
+                let vol = volumes[i] === 0 ? 1 : volumes[i];
+                // Tính độ lớn tuyệt đối (abs) của từng nến trong quá khứ
+                totalAbsDeltaPct += Math.abs((delta / vol) * 100);
+                validCandles++;
             }
+            // Mức bình thường (Average Baseline)
+            let avgAbsDeltaPct = validCandles > 0 ? (totalAbsDeltaPct / validCandles) : 1; 
+            if (avgAbsDeltaPct === 0) avgAbsDeltaPct = 1; // Rào lỗi chia cho 0
 
-            // 2. Trích xuất mảng Volume Cửa sổ B và tính TỔNG (Total Volume)
+            // 2. Tính Tổng Delta và Volume Cửa sổ B (O(1))
+            let cvdB = startIdxB > 0 ? cvdArray[cvdArray.length - 1] - cvdArray[startIdxB - 1] : cvdArray[cvdArray.length - 1];
             let volumesB = volumes.slice(startIdxB); 
-            let totalVolB = volumesB.reduce((sum, vol) => sum + vol, 0);
+            let totalVolB = volumesB.reduce((sum, vol) => sum + vol, 0) || 1;
 
-            if (totalVolB === 0) totalVolB = 1; // Rào lỗi chia cho 0
-
-            // 3. Tính Tỷ lệ Delta % (Delta Ratio)
+            // 3. Tính Delta % hiện tại
             let deltaPctB = (cvdB / totalVolB) * 100;
 
-            // 4. Đổ dữ liệu ra bảng HTML với màu sắc
+            // 4. TÍNH TỶ LỆ ĐỘT BIẾN (Relative Ratio) so với Trung bình
+            let relativeRatio = Math.abs(deltaPctB) / avgAbsDeltaPct;
+
+            // 5. Đổ dữ liệu ra bảng HTML với logic màu sắc mới
             let cvdRatioElem = document.getElementById('cvdRatioB');
             if (cvdRatioElem) {
-                let arrow = deltaPctB > 0 ? "🔥 MUA ÁP ĐẢO " : "🩸 BÁN ÁP ĐẢO ";
-                let color = deltaPctB > 0 ? "#00ff88" : "#ff3333";
+                let sign = deltaPctB > 0 ? "+" : "-"; // Dấu thể hiện phe nào đang cầm trịch
                 
-                // Nếu tỷ lệ dưới 5% thì coi như thị trường đang Sideway/Cân bằng, cho màu xám
-                if (Math.abs(deltaPctB) < 5) {
-                    arrow = "⚖️ CÂN BẰNG ";
-                    color = "#aaaaaa";
+                // Trạng thái mặc định: Sideway / Cân bằng / Bị hấp thụ (Lực < 0.8 lần TB)
+                let color = "#aaaaaa"; // Màu xám
+                let statusTxt = "⚖️ ĐANG HẤP THỤ";
+                let glow = "0 0 2px #aaaaaa";
+
+                // Đánh giá mức độ đột biến so với lực trung bình
+                if (relativeRatio >= 1.5) {
+                    // Cực kỳ đột biến (> 1.5 lần mức bình thường)
+                    color = deltaPctB > 0 ? "#00ff88" : "#ff3333";
+                    statusTxt = deltaPctB > 0 ? "🔥 MUA ĐỘT BIẾN" : "🩸 BÁN ĐỘT BIẾN";
+                    glow = `0 0 10px ${color}`;
+                } else if (relativeRatio >= 0.8) {
+                    // Lực xấp xỉ hoặc nhỉnh hơn mức trung bình (0.8x - 1.5x)
+                    color = deltaPctB > 0 ? "#80ffc0" : "#ff8080"; // Xanh/Đỏ nhạt hơn
+                    statusTxt = deltaPctB > 0 ? "📈 MUA CHỦ ĐỘNG" : "📉 BÁN CHỦ ĐỘNG";
+                    glow = `0 0 4px ${color}`;
                 }
-                
-                cvdRatioElem.innerText = `${arrow} ${Math.abs(deltaPctB).toFixed(2)}% (Vol: ${Math.round(totalVolB)})`;
+
+                // Xuất ra màn hình: Trạng thái | +2.50x TB (Vol: 1000)
+                cvdRatioElem.innerText = `${statusTxt} | ${sign}${relativeRatio.toFixed(2)}x TB (Vol: ${Math.round(totalVolB)})`;
                 cvdRatioElem.style.color = color;
-                cvdRatioElem.style.textShadow = `0 0 5px ${color}`;
+                cvdRatioElem.style.textShadow = glow;
             }
             // =========================================================
 
@@ -706,7 +729,7 @@
             let startIdxA = Math.max(0, times.length - periodA);
 
             // Bước nhảy 120 nến (2 giờ = 120 phút)
-            windowHours = 120;
+            windowHours = 1;
             for (let i = startIdxA; i < times.length; i += windowHours) {
                 // Giới hạn không cho vòng lặp chạy lố mảng ở đoạn cuối
                 let chunkEnd = Math.min(i + windowHours, times.length);
@@ -763,7 +786,7 @@
             
             let stdDevATR_1H = hourlyTRs.length > 0 ? Math.sqrt(sumVarianceATR / hourlyTRs.length) : 0;
             
-            // 2. Thiết lập Z-Score cho Margin (Z = 1.0 nghĩa là Khiên bảo vệ cấp độ %)
+            // 2. Thiết lập Z-Score cho Margin (Z = 1.25 nghĩa là Khiên bảo vệ cấp độ %)
             // Bác có thể thay đổi con số 1.25 này thành 1.5 hoặc 2.0 tùy độ "nhát gan"
             let zScoreATR = 1.25; // Mặc định là 1.25, tức là Khiên bảo vệ cấp độ ~%
             
