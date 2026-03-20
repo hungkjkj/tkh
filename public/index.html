@@ -763,9 +763,9 @@
             
             let stdDevATR_1H = hourlyTRs.length > 0 ? Math.sqrt(sumVarianceATR / hourlyTRs.length) : 0;
             
-            // 2. Thiết lập Z-Score cho Margin (Z = 2.5 nghĩa là Khiên bảo vệ cấp độ 99%)
-            // Bác có thể thay đổi con số 2.5 này thành 3.0 hoặc 3.5 tùy độ "nhát gan"
-            let zScoreATR = 2.5; // Mặc định là 2.5, tức là Khiên bảo vệ cấp độ ~99%
+            // 2. Thiết lập Z-Score cho Margin (Z = 1.0 nghĩa là Khiên bảo vệ cấp độ %)
+            // Bác có thể thay đổi con số 1.25 này thành 1.5 hoặc 2.0 tùy độ "nhát gan"
+            let zScoreATR = 1.25; // Mặc định là 1.25, tức là Khiên bảo vệ cấp độ ~%
             
             // 3. Công thức Margin Bọc Thép
             let breakoutMargin = meanATR_1H + (zScoreATR * stdDevATR_1H);
