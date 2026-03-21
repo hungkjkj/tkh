@@ -83,7 +83,7 @@
                 <tr><th>8. Compression Score</th><td id="compScore">-</td></tr>
                 <tr><th>9. VWAP (Window B)</th><td id="vwapWindowB" style="color: #ff00ff; font-weight: bold; text-shadow: 0 0 5px #ff00ff;">-</td></tr>
                 <tr><th>10. Breakout Margin (heheheh)</th><td id="marginATR" style="color: #00ffcc; font-weight: bold; text-shadow: 0 0 5px #00ffcc;">-</td></tr>
-                <tr><th>11. Window B Delta CVD (vs total volume)</th><td id="cvdRatioB" style="color: #00e5ff; font-weight: bold; text-shadow: 0 0 5px #00e5ff;">-</td></tr>
+                <tr><th>11. Window B Delta CVD (secret formula)</th><td id="cvdRatioB" style="color: #00e5ff; font-weight: bold; text-shadow: 0 0 5px #00e5ff;">-</td></tr>
             </table>
     </div>
 
@@ -640,62 +640,50 @@
 
 
             // =========================================================
-            // --- THUẬT TOÁN V2: DYNAMIC NORMALIZED DELTA RATIO ---
+            // --- THUẬT TOÁN V3: RAW DELTA VS AVERAGE DELTA ---
             // =========================================================
 
-            // 1. TÍNH ĐƯỜNG CƠ SỞ (BASELINE): Trung bình độ lớn Delta % của 50 nến trước đó
-            let totalAbsDeltaPct = 0;
+            // 1. TÍNH ĐƯỜNG CƠ SỞ: Trung bình độ lớn Delta THUẦN của 50 nến trước đó
+            let totalAbsDelta = 0;
             let validCandles = 0;
-            let lookbackPeriod = Math.min(50, volumes.length); // Bạn có thể chỉnh số 50 này
+            let lookbackPeriod = Math.min(50, cvdArray.length - 1); 
 
-            for (let i = volumes.length - lookbackPeriod; i < volumes.length; i++) {
+            for (let i = cvdArray.length - lookbackPeriod; i < cvdArray.length; i++) {
                 let prevCvd = i > 0 ? cvdArray[i - 1] : 0;
-                let delta = cvdArray[i] - prevCvd;
-                let vol = volumes[i] === 0 ? 1 : volumes[i];
-                // Tính độ lớn tuyệt đối (abs) của từng nến trong quá khứ
-                totalAbsDeltaPct += Math.abs((delta / vol) * 100);
+                let rawDelta = cvdArray[i] - prevCvd;
+                totalAbsDelta += Math.abs(rawDelta);
                 validCandles++;
             }
-            // Mức bình thường (Average Baseline)
-            let avgAbsDeltaPct = validCandles > 0 ? (totalAbsDeltaPct / validCandles) : 1; 
-            if (avgAbsDeltaPct === 0) avgAbsDeltaPct = 1; // Rào lỗi chia cho 0
+            
+            let avgAbsDelta = validCandles > 0 ? (totalAbsDelta / validCandles) : 1; 
+            if (avgAbsDelta === 0) avgAbsDelta = 1; // Rào lỗi chia cho 0
 
-            // 2. Tính Tổng Delta và Volume Cửa sổ B (O(1))
-            let cvdB = startIdxB > 0 ? cvdArray[cvdArray.length - 1] - cvdArray[startIdxB - 1] : cvdArray[cvdArray.length - 1];
-            let volumesB = volumes.slice(startIdxB); 
-            let totalVolB = volumesB.reduce((sum, vol) => sum + vol, 0) || 1;
+            // 2. Lấy Delta thuần của Cửa sổ hiện tại (Hoặc nến hiện tại)
+            let currentRawDelta = startIdxB > 0 ? cvdArray[cvdArray.length - 1] - cvdArray[startIdxB - 1] : cvdArray[cvdArray.length - 1];
 
-            // 3. Tính Delta % hiện tại
-            let deltaPctB = (cvdB / totalVolB) * 100;
+            // 3. Tính tỷ lệ so với trung bình (Độ lớn thuần túy)
+            let relativeRatio = Math.abs(currentRawDelta) / avgAbsDelta;
 
-            // 4. TÍNH TỶ LỆ ĐỘT BIẾN (Relative Ratio) so với Trung bình
-            let relativeRatio = Math.abs(deltaPctB) / avgAbsDeltaPct;
-
-            // 5. Đổ dữ liệu ra bảng HTML với logic màu sắc mới
+            // 4. Đổ dữ liệu ra bảng HTML
             let cvdRatioElem = document.getElementById('cvdRatioB');
             if (cvdRatioElem) {
-                let sign = deltaPctB > 0 ? "+" : "-"; // Dấu thể hiện phe nào đang cầm trịch
+                let sign = currentRawDelta > 0 ? "+" : "-"; 
                 
-                // Trạng thái mặc định: Sideway / Cân bằng / Bị hấp thụ (Lực < 0.8 lần TB)
-                let color = "#aaaaaa"; // Màu xám
+                let color = "#aaaaaa"; 
                 let statusTxt = "⚖️ ĐANG HẤP THỤ";
                 let glow = "0 0 2px #aaaaaa";
 
-                // Đánh giá mức độ đột biến so với lực trung bình
                 if (relativeRatio >= 1.5) {
-                    // Cực kỳ đột biến (> 1.5 lần mức bình thường)
-                    color = deltaPctB > 0 ? "#00ff88" : "#ff3333";
-                    statusTxt = deltaPctB > 0 ? "🔥 MUA ĐỘT BIẾN" : "🩸 BÁN ĐỘT BIẾN";
+                    color = currentRawDelta > 0 ? "#00ff88" : "#ff3333";
+                    statusTxt = currentRawDelta > 0 ? "🔥 MUA ĐỘT BIẾN" : "🩸 BÁN ĐỘT BIẾN";
                     glow = `0 0 10px ${color}`;
                 } else if (relativeRatio >= 0.8) {
-                    // Lực xấp xỉ hoặc nhỉnh hơn mức trung bình (0.8x - 1.5x)
-                    color = deltaPctB > 0 ? "#80ffc0" : "#ff8080"; // Xanh/Đỏ nhạt hơn
-                    statusTxt = deltaPctB > 0 ? "📈 MUA CHỦ ĐỘNG" : "📉 BÁN CHỦ ĐỘNG";
+                    color = currentRawDelta > 0 ? "#80ffc0" : "#ff8080"; 
+                    statusTxt = currentRawDelta > 0 ? "📈 MUA CHỦ ĐỘNG" : "📉 BÁN CHỦ ĐỘNG";
                     glow = `0 0 4px ${color}`;
                 }
 
-                // Xuất ra màn hình: Trạng thái | +2.50x TB (Vol: 1000)
-                cvdRatioElem.innerText = `${statusTxt} | ${sign}${relativeRatio.toFixed(2)}x TB (Vol: ${Math.round(totalVolB)})`;
+                cvdRatioElem.innerText = `${statusTxt} | ${sign}${relativeRatio.toFixed(2)}x TB`;
                 cvdRatioElem.style.color = color;
                 cvdRatioElem.style.textShadow = glow;
             }
