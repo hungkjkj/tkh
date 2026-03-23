@@ -579,37 +579,43 @@
                 }
             }
 
-            // 2. Khởi tạo mảng chứa các đường kẻ (Shapes)
-            let chartShapes = [];
+            // --- XÓA CHART SHAPES CŨ, CHUYỂN SANG DÙNG TRACES ĐỂ HIỆN TOOLTIP ---
+            let firstTime = times[0];
+            let lastTime = times[times.length - 1];
 
-            // --- VẼ POC (Rốn thanh khoản - Đường Vàng nét liền, dày) ---
-            chartShapes.push({
-                type: 'line', x0: 0, x1: 1, xref: 'paper',
-                y0: vpData.POC, y1: vpData.POC, yref: 'y',
-                line: { color: 'gold', width: 2 }
-            });
+            // --- VẼ POC (Rốn thanh khoản) ---
+            const tracePOC = {
+                x: [firstTime, lastTime], y: [vpData.POC, vpData.POC],
+                type: 'scatter', mode: 'lines', name: 'POC',
+                line: { color: 'gold', width: 2 },
+                hoverinfo: 'y+name', hoverlabel: { bgcolor: 'gold', font: {color: 'black'} }
+            };
 
-            // --- VẼ VAH (Biên trên vùng giá trị - Đường Đỏ nét đứt) ---
-            chartShapes.push({
-                type: 'line', x0: 0, x1: 1, xref: 'paper',
-                y0: vpData.VAH, y1: vpData.VAH, yref: 'y',
-                line: { color: 'rgba(255, 50, 50, 0.6)', width: 1.5, dash: 'dash' }
-            });
+            // --- VẼ VAH (Biên trên) ---
+            const traceVAH = {
+                x: [firstTime, lastTime], y: [vpData.VAH, vpData.VAH],
+                type: 'scatter', mode: 'lines', name: 'VAH',
+                line: { color: 'rgba(255, 50, 50, 0.8)', width: 1.5, dash: 'dash' },
+                hoverinfo: 'y+name', hoverlabel: { bgcolor: 'rgba(255, 50, 50, 0.9)', font: {color: 'white'} }
+            };
 
-            // --- VẼ VAL (Biên dưới vùng giá trị - Đường Xanh nét đứt) ---
-            chartShapes.push({
-                type: 'line', x0: 0, x1: 1, xref: 'paper',
-                y0: vpData.VAL, y1: vpData.VAL, yref: 'y',
-                line: { color: 'rgba(0, 255, 136, 0.6)', width: 1.5, dash: 'dash' }
-            });
+            // --- VẼ VAL (Biên dưới) ---
+            const traceVAL = {
+                x: [firstTime, lastTime], y: [vpData.VAL, vpData.VAL],
+                type: 'scatter', mode: 'lines', name: 'VAL',
+                line: { color: 'rgba(0, 255, 136, 0.8)', width: 1.5, dash: 'dash' },
+                hoverinfo: 'y+name', hoverlabel: { bgcolor: 'rgba(0, 255, 136, 0.9)', font: {color: 'black'} }
+            };
 
-            // --- VẼ LVN (Các thung lũng tử thần - Đường Xám chấm bi) ---
+            // --- VẼ LVN ---
+            let traceLVNs = [];
             if (vpData.LVNs && vpData.LVNs.length > 0) {
-                vpData.LVNs.forEach(lvnPrice => {
-                    chartShapes.push({
-                        type: 'line', x0: 0, x1: 1, xref: 'paper',
-                        y0: lvnPrice, y1: lvnPrice, yref: 'y',
-                        line: { color: '#FF5F1F', width: 1.5, dash: 'dot' }
+                vpData.LVNs.forEach((lvnPrice, idx) => {
+                    traceLVNs.push({
+                        x: [firstTime, lastTime], y: [lvnPrice, lvnPrice],
+                        type: 'scatter', mode: 'lines', name: 'LVN ' + (idx + 1),
+                        line: { color: '#FF5F1F', width: 1.5, dash: 'dot' },
+                        hoverinfo: 'y+name', hoverlabel: { bgcolor: '#FF5F1F', font: {color: 'white'} }
                     });
                 });
             }
@@ -638,12 +644,27 @@
             // Tìm mốc bắt đầu của Cửa sổ B (lấy periodB cây nến cuối cùng)
             let startIdxB = Math.max(0, times.length - periodB);
 
+            for (let i = startIdxB; i < times.length; i++) {
+                let typPrice = (highs[i] + lows[i] + closes[i]) / 3;
+                sumVolPriceB += typPrice * volumes[i];
+                sumVolB += volumes[i];
+            }
+
+            // Chống lỗi chia cho 0 nếu đoạn đó không có Volume
+            let vwapB = sumVolB > 0 ? (sumVolPriceB / sumVolB) : 0;
+
+            // Xuất dữ liệu VWAP ra bảng HTML
+            let vwapBElem = document.getElementById('vwapWindowB');
+            if (vwapBElem) {
+                vwapBElem.innerText = vwapB.toFixed(4); 
+            }
+            // =========================================================
 
             // =========================================================
             // --- THUẬT TOÁN V3: RAW DELTA VS AVERAGE DELTA ---
             // =========================================================
+            // (Đã di chuyển xuống dưới để logic gọn gàng hơn)
 
-            // 1. TÍNH ĐƯỜNG CƠ SỞ: Trung bình độ lớn Delta THUẦN của 50 nến trước đó
             let totalAbsDelta = 0;
             let validCandles = 0;
             let lookbackPeriod = Math.min(50, cvdArray.length - 1); 
@@ -656,54 +677,35 @@
             }
             
             let avgAbsDelta = validCandles > 0 ? (totalAbsDelta / validCandles) : 1; 
-            if (avgAbsDelta === 0) avgAbsDelta = 1; // Rào lỗi chia cho 0
+            if (avgAbsDelta === 0) avgAbsDelta = 1; 
 
-            // 2. Lấy Delta thuần của Cửa sổ hiện tại (Hoặc nến hiện tại)
-            let currentRawDelta = startIdxB > 0 ? cvdArray[cvdArray.length - 1] - cvdArray[startIdxB - 1] : cvdArray[cvdArray.length - 1];
+            // Tính Delta thuần của toàn bộ Cửa sổ B
+            let cvdB = startIdxB > 0 ? cvdArray[cvdArray.length - 1] - cvdArray[startIdxB - 1] : cvdArray[cvdArray.length - 1];
 
-            // 3. Tính tỷ lệ so với trung bình (Độ lớn thuần túy)
-            let relativeRatio = Math.abs(currentRawDelta) / avgAbsDelta;
+            // Tỷ lệ so với trung bình
+            let relativeRatio = Math.abs(cvdB) / avgAbsDelta;
 
-            // 4. Đổ dữ liệu ra bảng HTML
+            // Đổ dữ liệu ra bảng HTML (id="cvdRatioB")
             let cvdRatioElem = document.getElementById('cvdRatioB');
             if (cvdRatioElem) {
-                let sign = currentRawDelta > 0 ? "+" : "-"; 
-                
+                let sign = cvdB > 0 ? "+" : "-"; 
                 let color = "#aaaaaa"; 
                 let statusTxt = "⚖️ ĐANG HẤP THỤ";
                 let glow = "0 0 2px #aaaaaa";
 
                 if (relativeRatio >= 1.5) {
-                    color = currentRawDelta > 0 ? "#00ff88" : "#ff3333";
-                    statusTxt = currentRawDelta > 0 ? "🔥 MUA ĐỘT BIẾN" : "🩸 BÁN ĐỘT BIẾN";
+                    color = cvdB > 0 ? "#00ff88" : "#ff3333";
+                    statusTxt = cvdB > 0 ? "🔥 MUA ĐỘT BIẾN" : "🩸 BÁN ĐỘT BIẾN";
                     glow = `0 0 10px ${color}`;
                 } else if (relativeRatio >= 0.8) {
-                    color = currentRawDelta > 0 ? "#80ffc0" : "#ff8080"; 
-                    statusTxt = currentRawDelta > 0 ? "📈 MUA CHỦ ĐỘNG" : "📉 BÁN CHỦ ĐỘNG";
+                    color = cvdB > 0 ? "#80ffc0" : "#ff8080"; 
+                    statusTxt = cvdB > 0 ? "📈 MUA CHỦ ĐỘNG" : "📉 BÁN CHỦ ĐỘNG";
                     glow = `0 0 4px ${color}`;
                 }
 
                 cvdRatioElem.innerText = `${statusTxt} | ${sign}${relativeRatio.toFixed(2)}x TB`;
                 cvdRatioElem.style.color = color;
                 cvdRatioElem.style.textShadow = glow;
-            }
-            // =========================================================
-
-
-            for (let i = startIdxB; i < times.length; i++) {
-                let typPrice = (highs[i] + lows[i] + closes[i]) / 3;
-                sumVolPriceB += typPrice * volumes[i];
-                sumVolB += volumes[i];
-            }
-
-            // Chống lỗi chia cho 0 nếu đoạn đó không có Volume
-            let vwapB = sumVolB > 0 ? (sumVolPriceB / sumVolB) : 0;
-
-            // Xuất dữ liệu ra cái bảng HTML vừa tạo ở trên
-            let vwapBElem = document.getElementById('vwapWindowB');
-            if (vwapBElem) {
-                // Hiển thị 4 số thập phân để phù hợp với cả Crypto lẫn Vàng
-                vwapBElem.innerText = vwapB.toFixed(4); 
             }
             // =========================================================
 
@@ -794,7 +796,6 @@
                 paper_bgcolor: '#1e1e1e', plot_bgcolor: '#1e1e1e', font: { color: '#ccc' },
                 margin: { l: 50, r: 50, t: 30, b: 30 },
                 xaxis: { rangeslider: { visible: false } },
-                shapes: chartShapes,
                 // Tầng 1: Biểu đồ Giá (Chiếm 55% không gian phía trên)
                 yaxis: { domain: [0.45, 1], title: 'Price' },                     
                 
@@ -814,7 +815,9 @@
             let plotData = [
                 traceCandle, traceUpperA, traceLowerA, traceLRA, 
                 // traceUpper3B, traceLower3B, (Nếu bác dùng Z=3 thì nhét vào)
-                traceUpperB, traceLowerB, traceLRB, traceVWAP, traceVolume, traceCVD
+                traceUpperB, traceLowerB, traceLRB, traceVWAP, traceVolume, traceCVD,
+                tracePOC, traceVAH, traceVAL,
+                ...traceLVNs, // Nếu có nhiều LVN thì dùng spread operator để nhét tất cả vào đây
             ];
 
             if (chartDiv && chartDiv.data) {
