@@ -661,10 +661,10 @@
             // =========================================================
 
             // =========================================================
-            // --- THUẬT TOÁN V3: RAW DELTA VS AVERAGE DELTA ---
+            // --- THUẬT TOÁN V3: RAW DELTA VS AVERAGE DELTA (BẢN CHUẨN) ---
             // =========================================================
-            // (Đã di chuyển xuống dưới để logic gọn gàng hơn)
 
+            // 1. TÍNH ĐƯỜNG CƠ SỞ: Trung bình độ lớn Delta THUẦN của 50 nến trước đó (Mỗi nến)
             let totalAbsDelta = 0;
             let validCandles = 0;
             let lookbackPeriod = Math.min(50, cvdArray.length - 1); 
@@ -677,18 +677,27 @@
             }
             
             let avgAbsDelta = validCandles > 0 ? (totalAbsDelta / validCandles) : 1; 
-            if (avgAbsDelta === 0) avgAbsDelta = 1; 
+            if (avgAbsDelta === 0) avgAbsDelta = 1; // Rào lỗi chia cho 0
 
-            // Tính Delta thuần của toàn bộ Cửa sổ B
+            // 2. TÍNH DELTA THUẦN CỦA CỬA SỔ B VÀ QUY ĐỔI VỀ 1 NẾN
+            // Tính Tổng Net Delta của toàn bộ Cửa sổ B
             let cvdB = startIdxB > 0 ? cvdArray[cvdArray.length - 1] - cvdArray[startIdxB - 1] : cvdArray[cvdArray.length - 1];
+            
+            // Lấy số lượng nến thực tế trong Cửa sổ B
+            let actualPeriodB = times.length - startIdxB; 
+            
+            // Băm nhỏ: Trung bình mỗi nến trong Cửa sổ B có lực bao nhiêu
+            let avgCvdB = actualPeriodB > 0 ? (cvdB / actualPeriodB) : cvdB;
 
-            // Tỷ lệ so với trung bình
-            let relativeRatio = Math.abs(cvdB) / avgAbsDelta;
+            // 3. TÍNH TỶ LỆ SO SÁNH (Táo so với Táo: 1 Nến B vs 1 Nến Quá khứ)
+            let relativeRatio = Math.abs(avgCvdB) / avgAbsDelta;
 
-            // Đổ dữ liệu ra bảng HTML (id="cvdRatioB")
+            // 4. ĐỔ DỮ LIỆU RA BẢNG HTML
             let cvdRatioElem = document.getElementById('cvdRatioB');
             if (cvdRatioElem) {
+                // Dùng cvdB (Tổng Delta) để xét xem Phe nào đang làm chủ tình hình
                 let sign = cvdB > 0 ? "+" : "-"; 
+                
                 let color = "#aaaaaa"; 
                 let statusTxt = "⚖️ ĐANG HẤP THỤ";
                 let glow = "0 0 2px #aaaaaa";
