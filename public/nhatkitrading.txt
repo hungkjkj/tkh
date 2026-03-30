@@ -39,6 +39,13 @@ Tuyệt đối không tính rủi ro bằng số lượng BTC, phải tính bằ
   + Setup Hạng B (Đánh 0.5R): Đạt điều kiện Z-score nhưng chưa có Tường Limit xác nhận hoặc Delta hơi nhiễu.
   + Setup Hạng C (0R - Bỏ qua): Không có sự phân kỳ giữa Giá và Order Flow. Đứng ngoài quan sát.
 
+
+PHẦN 6: TƯ DUY ĐỊNH LƯỢNG (QUANT) & LỌC NHIỄU TÂM LÝ
+Tuyệt đối không để não bộ bị thao túng bởi tốc độ và hướng đi của giá khi nến đang chạy.
+- Ảo giác của quá trình (Tick-by-tick): Sự rung lắc, giật râu, đi nhanh hay chậm trong phiên phần lớn là nhiễu ngẫu nhiên (Random Walk Noise) và các đòn thao túng của Market Maker. Nhìn giá chạy sẽ sinh ra suy diễn vô căn cứ.
+- Niềm tin vào Toán học & Kết quả cuối cùng: Chỉ tin tưởng vào các phép toán đã được hệ thống hóa (Z-Score, CVD Ratio, ATR). Các chỉ số này chỉ có giá trị xác nhận tuyệt đối khi cây nến đã chính thức ĐÓNG CỬA.
+- Kỷ luật Thực thi (Execution): Mọi quyết định bóp cò, dời Stoploss (đặc biệt là dời về BE quá sớm), hay cắt lỗ đều phải dựa trên dữ liệu tĩnh đã chốt. Lờ đi sự hỗn loạn, chỉ giao dịch với kết quả của phương trình.
+
 =======================================================================
 "Giao dịch không phải là dự đoán tương lai, giao dịch là phản ứng với xác suất dựa trên dòng tiền hiện tại."
 =======================================================================
