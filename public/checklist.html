@@ -157,6 +157,24 @@
                         </div>
                     </label>
 
+                    <!-- NEW: Cung Cầu Cân Bằng -->
+                    <label class="check-item flex items-start gap-3 p-3 rounded-lg cursor-pointer border border-transparent">
+                        <input type="checkbox" id="chk_equilibrium" class="quant-checkbox mt-0.5" onchange="saveData()">
+                        <div>
+                            <p class="font-medium text-white">Cung Cầu đã Cân bằng (Equilibrium).</p>
+                            <p class="text-sm text-slate-400">Biên độ nến thu hẹp dần (Compression), phe mua và phe bán tạm ngừng chiến đấu để chuẩn bị "cho tàu chạy".</p>
+                        </div>
+                    </label>
+
+                    <!-- NEW: Khối lượng cạn kiệt (RVOL <= 1) -->
+                    <label class="check-item flex items-start gap-3 p-3 rounded-lg cursor-pointer border border-transparent">
+                        <input type="checkbox" id="chk_rvol" class="quant-checkbox mt-0.5" onchange="saveData()">
+                        <div>
+                            <p class="font-medium text-white">Khối lượng cạn kiệt (RVOL ≤ 1.0).</p>
+                            <p class="text-sm text-slate-400">Thanh khoản cạn khô dưới mức trung bình. Xác nhận không còn lực cản trước khi dòng tiền lớn kích nổ.</p>
+                        </div>
+                    </label>
+
                     <label class="check-item flex items-start gap-3 p-3 rounded-lg cursor-pointer border border-transparent">
                         <input type="checkbox" id="chk_stophunt" class="quant-checkbox mt-0.5" onchange="saveData()">
                         <div>
@@ -187,8 +205,12 @@
     </div>
 
     <script>
-        // Các ID của Checkbox
-        const checkboxes = ['chk_zscore', 'chk_cvd', 'chk_mtf', 'chk_structure', 'chk_stophunt', 'chk_close'];
+        // Cập nhật ID của Checkbox: Thêm chk_equilibrium và chk_rvol
+        const checkboxes = [
+            'chk_zscore', 'chk_cvd', 'chk_mtf', 
+            'chk_structure', 'chk_equilibrium', 'chk_rvol', 
+            'chk_stophunt', 'chk_close'
+        ];
         const radios = document.getElementsByName('bias');
 
         // Khởi chạy khi load trang
@@ -322,7 +344,7 @@
                 // Khôi phục Checkboxes
                 if (data.checks) {
                     checkboxes.forEach(id => {
-                        if (data.checks[id] !== undefined) {
+                        if (data.checks[id] !== undefined && document.getElementById(id)) {
                             document.getElementById(id).checked = data.checks[id];
                         }
                     });
@@ -336,7 +358,9 @@
                 radio.checked = false;
             }
             checkboxes.forEach(id => {
-                document.getElementById(id).checked = false;
+                if(document.getElementById(id)) {
+                    document.getElementById(id).checked = false;
+                }
             });
             saveData();
             updateBias();
