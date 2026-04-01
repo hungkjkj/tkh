@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trạm Kiểm Duyệt Vào Lệnh</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f172a; /* Slate 900 */
+            color: #e2e8f0; /* Slate 200 */
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        /* Custom Checkbox Styles */
+        .quant-checkbox {
+            appearance: none;
+            background-color: #1e293b;
+            margin: 0;
+            font: inherit;
+            color: currentColor;
+            width: 1.5em;
+            height: 1.5em;
+            border: 2px solid #475569;
+            border-radius: 0.25em;
+            display: grid;
+            place-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        .quant-checkbox::before {
+            content: "";
+            width: 0.8em;
+            height: 0.8em;
+            transform: scale(0);
+            transition: 120ms transform ease-in-out;
+            box-shadow: inset 1em 1em currentColor;
+            transform-origin: center;
+            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+        }
+        .quant-checkbox:checked::before {
+            transform: scale(1);
+        }
+        
+        /* Bias specific colors */
+        .bias-long .quant-checkbox:checked {
+            background-color: #10b981; /* Emerald 500 */
+            border-color: #10b981;
+            color: #0f172a;
+        }
+        .bias-short .quant-checkbox:checked {
+            background-color: #ef4444; /* Red 500 */
+            border-color: #ef4444;
+            color: #0f172a;
+        }
+        .bias-neutral .quant-checkbox:checked {
+            background-color: #3b82f6; /* Blue 500 */
+            border-color: #3b82f6;
+            color: #0f172a;
+        }
+
+        .check-item {
+            transition: background-color 0.2s;
+        }
+        .check-item:hover {
+            background-color: #1e293b;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex justify-center bias-neutral" id="appBody">
+
+    <div class="max-w-3xl w-full bg-slate-800 rounded-xl shadow-2xl border border-slate-700 overflow-hidden flex flex-col">
+        
+        <!-- Header -->
+        <div class="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                    <span id="headerIcon">⚡</span> KIỂM DUYỆT VÀO LỆNH
+                </h1>
+                <p class="text-slate-400 text-sm mt-1">Hệ thống Z-Score & Order Flow</p>
+            </div>
+            <button onclick="resetChecklist()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors flex items-center gap-2 text-sm border border-slate-600">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                RESET LỆNH
+            </button>
+        </div>
+
+        <div class="p-6 space-y-8 flex-1 overflow-y-auto">
+
+            <!-- PHẦN 1: TÌM BIAS -->
+            <section class="space-y-4">
+                <div class="flex items-center gap-2 pb-2 border-b border-slate-700">
+                    <span class="bg-blue-500/20 text-blue-400 font-bold w-8 h-8 rounded-full flex items-center justify-center border border-blue-500/30">1</span>
+                    <h2 class="text-xl font-semibold text-white">Xác định Bias (Sự mất cân bằng)</h2>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <label class="relative flex cursor-pointer rounded-lg border bg-slate-900/50 p-4 shadow-sm focus:outline-none border-slate-600 hover:border-emerald-500 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10 transition-all">
+                        <input type="radio" name="bias" value="LONG" class="peer sr-only" onchange="updateBias()">
+                        <div class="flex flex-col">
+                            <span class="text-emerald-400 font-bold text-lg mb-1">🔥 BIAS MUA (LONG)</span>
+                            <span class="text-slate-400 text-sm">Z-Score < -3, Giá giảm nhưng có dấu hiệu Hấp thụ Bán. Phe mua đang kê tường Limit đón lõng.</span>
+                        </div>
+                    </label>
+
+                    <label class="relative flex cursor-pointer rounded-lg border bg-slate-900/50 p-4 shadow-sm focus:outline-none border-slate-600 hover:border-red-500 has-[:checked]:border-red-500 has-[:checked]:bg-red-500/10 transition-all">
+                        <input type="radio" name="bias" value="SHORT" class="peer sr-only" onchange="updateBias()">
+                        <div class="flex flex-col">
+                            <span class="text-red-400 font-bold text-lg mb-1">🩸 BIAS BÁN (SHORT)</span>
+                            <span class="text-slate-400 text-sm">Z-Score > +3, Giá tăng nhưng có dấu hiệu Hấp thụ Mua. Phe bán đang kê tường Limit đè giá.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="space-y-2" id="imbalanceChecks">
+                    <label class="check-item flex items-start gap-3 p-3 rounded-lg cursor-pointer border border-transparent">
+                        <input type="checkbox" id="chk_zscore" class="quant-checkbox mt-0.5" onchange="saveData()">
+                        <div>
+                            <p class="font-medium text-white">Giá đã nằm ở Cực trị Thống kê</p>
+                            <p class="text-sm text-slate-400">Giá chạm các vùng biên độ xa (Z-Score > 3 hoặc < -3), nằm ngoài giá trị hợp lý (Value Area).</p>
+                        </div>
+                    </label>
+                    <label class="check-item flex items-start gap-3 p-3 rounded-lg cursor-pointer border border-transparent">
+                        <input type="checkbox" id="chk_cvd" class="quant-checkbox mt-0.5" onchange="saveData()">
+                        <div>
+                            <p class="font-medium text-white">Phát hiện Sự phân kỳ giữa Hành động Giá & CVD</p>
+                            <p class="text-sm text-slate-400">Nỗ lực đâm xuyên cực lớn (Delta CVD cao) nhưng Giá bị chững lại, thể hiện Tường Limit đang hấp thụ.</p>
+                        </div>
+                    </label>
+                </div>
+            </section>
+
+            <!-- PHẦN 2: TÌM ĐIỂM VÀO LỆNH (ENTRY) -->
+            <section class="space-y-4 opacity-50 pointer-events-none transition-all duration-300" id="entrySection">
+                <div class="flex items-center gap-2 pb-2 border-b border-slate-700">
+                    <span id="step2Badge" class="bg-slate-500/20 text-slate-400 font-bold w-8 h-8 rounded-full flex items-center justify-center border border-slate-500/30 transition-colors">2</span>
+                    <h2 class="text-xl font-semibold text-white">Xác nhận Điểm bóp cò (Entry tại POC)</h2>
+                </div>
+
+                <!-- Cảnh báo Đa khung thời gian -->
+                <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4 flex gap-3">
+                    <span class="text-amber-500 text-xl">⚠️</span>
+                    <div>
+                        <p class="text-amber-400 font-bold text-sm">NGUYÊN TẮC ĐA KHUNG (MULTI-TIMEFRAME)</p>
+                        <p class="text-amber-200/70 text-sm mt-1">Đã nhìn cấu trúc D1/H4 để lấy Context (Thiên kiến) chưa? Đã zoom vào m15/m5 để bắt chính xác điểm giá tạo thanh khoản quanh POC chưa?</p>
+                    </div>
+                    <div class="ml-auto flex items-center">
+                        <input type="checkbox" id="chk_mtf" class="quant-checkbox" onchange="saveData()">
+                    </div>
+                </div>
+
+                <div class="space-y-2 bg-slate-900/30 p-2 rounded-xl border border-slate-800">
+                    <label class="check-item flex items-start gap-3 p-3 rounded-lg cursor-pointer border border-transparent">
+                        <input type="checkbox" id="chk_structure" class="quant-checkbox mt-0.5" onchange="saveData()">
+                        <div>
+                            <p class="font-medium text-white" id="txt_structure">Giá đã tạo cấu trúc (Đáy/Đỉnh) gần rốn thanh khoản POC.</p>
+                            <p class="text-sm text-slate-400">Thị trường đã có nhịp dừng giảm/tăng và bắt đầu tích lũy/phân phối ngay sát đường POC.</p>
+                        </div>
+                    </label>
+
+                    <label class="check-item flex items-start gap-3 p-3 rounded-lg cursor-pointer border border-transparent">
+                        <input type="checkbox" id="chk_stophunt" class="quant-checkbox mt-0.5" onchange="saveData()">
+                        <div>
+                            <p class="font-medium text-white" id="txt_stophunt">Đã có nhịp giật râu Quét thanh khoản (Stop Hunt) qua POC.</p>
+                            <p class="text-sm text-slate-400">Market Maker đã đâm lủng cấu trúc vừa tạo để cắn Stoploss của đám đông bám đuôi sớm.</p>
+                        </div>
+                    </label>
+
+                    <label class="check-item flex items-start gap-3 p-3 rounded-lg cursor-pointer border border-transparent">
+                        <input type="checkbox" id="chk_close" class="quant-checkbox mt-0.5" onchange="saveData()">
+                        <div>
+                            <p class="font-medium text-white" id="txt_close">Nến đã ĐÓNG CỬA rút chân xác nhận bẫy.</p>
+                            <p class="text-sm text-slate-400">Tuyệt đối không vào khi nến đang chạy. Nến đóng cửa bảo toàn được POC là lúc bóp cò.</p>
+                        </div>
+                    </label>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- Footer Action -->
+        <div class="p-6 border-t border-slate-700 bg-slate-800/80">
+            <div id="statusBanner" class="w-full py-4 rounded-lg text-center font-bold text-lg bg-slate-700 text-slate-400 border border-slate-600 transition-all duration-300">
+                HÃY XÁC ĐỊNH BIAS ĐỂ BẮT ĐẦU
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Các ID của Checkbox
+        const checkboxes = ['chk_zscore', 'chk_cvd', 'chk_mtf', 'chk_structure', 'chk_stophunt', 'chk_close'];
+        const radios = document.getElementsByName('bias');
+
+        // Khởi chạy khi load trang
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            updateBias(); // Cập nhật UI dựa trên data vừa load
+        });
+
+        // Hàm cập nhật Giao diện Động dựa vào Bias (Long/Short)
+        function updateBias() {
+            let selectedBias = null;
+            for (const radio of radios) {
+                if (radio.checked) selectedBias = radio.value;
+            }
+
+            const body = document.getElementById('appBody');
+            const entrySection = document.getElementById('entrySection');
+            const step2Badge = document.getElementById('step2Badge');
+            
+            // Xóa class cũ
+            body.classList.remove('bias-neutral', 'bias-long', 'bias-short');
+
+            if (!selectedBias) {
+                body.classList.add('bias-neutral');
+                entrySection.classList.add('opacity-50', 'pointer-events-none');
+                updateStatusBanner();
+                saveData();
+                return;
+            }
+
+            // Mở khóa Phần 2
+            entrySection.classList.remove('opacity-50', 'pointer-events-none');
+            
+            // Đổi Text Động cho phần Entry
+            const txtStructure = document.getElementById('txt_structure');
+            const txtStophunt = document.getElementById('txt_stophunt');
+            const txtClose = document.getElementById('txt_close');
+
+            if (selectedBias === 'LONG') {
+                body.classList.add('bias-long');
+                step2Badge.className = "bg-emerald-500/20 text-emerald-400 font-bold w-8 h-8 rounded-full flex items-center justify-center border border-emerald-500/30 transition-colors";
+                
+                txtStructure.innerHTML = 'Giá đã tạo <span class="text-emerald-400 font-bold">ĐÁY</span> cấu trúc gần rốn thanh khoản POC.';
+                txtStophunt.innerHTML = 'Đã có nhịp giật râu Quét thanh khoản (Stop Hunt) <span class="text-emerald-400 font-bold">BÊN DƯỚI</span> POC.';
+                txtClose.innerHTML = 'Nến đã ĐÓNG CỬA <span class="text-emerald-400 font-bold">RÚT CHÂN LÊN TRÊN</span> POC.';
+            } else if (selectedBias === 'SHORT') {
+                body.classList.add('bias-short');
+                step2Badge.className = "bg-red-500/20 text-red-400 font-bold w-8 h-8 rounded-full flex items-center justify-center border border-red-500/30 transition-colors";
+                
+                txtStructure.innerHTML = 'Giá đã tạo <span class="text-red-400 font-bold">ĐỈNH</span> cấu trúc gần rốn thanh khoản POC.';
+                txtStophunt.innerHTML = 'Đã có nhịp giật râu Quét thanh khoản (Stop Hunt) <span class="text-red-400 font-bold">BÊN TRÊN</span> POC.';
+                txtClose.innerHTML = 'Nến đã ĐÓNG CỬA <span class="text-red-400 font-bold">RÚT RÂU XUỐNG DƯỚI</span> POC.';
+            }
+
+            updateStatusBanner();
+            saveData();
+        }
+
+        // Cập nhật Banner Trạng thái cuối cùng
+        function updateStatusBanner() {
+            let selectedBias = null;
+            for (const radio of radios) {
+                if (radio.checked) selectedBias = radio.value;
+            }
+
+            const banner = document.getElementById('statusBanner');
+            
+            if (!selectedBias) {
+                banner.className = "w-full py-4 rounded-lg text-center font-bold text-lg bg-slate-700 text-slate-400 border border-slate-600 transition-all duration-300";
+                banner.innerText = "HÃY XÁC ĐỊNH BIAS ĐỂ BẮT ĐẦU";
+                return;
+            }
+
+            // Kiểm tra xem đã tick hết chưa
+            let allChecked = true;
+            checkboxes.forEach(id => {
+                if (!document.getElementById(id).checked) allChecked = false;
+            });
+
+            if (allChecked) {
+                if (selectedBias === 'LONG') {
+                    banner.className = "w-full py-4 rounded-lg text-center font-bold text-xl bg-emerald-500 text-slate-900 border border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all duration-300 animate-pulse";
+                    banner.innerText = "✅ TẤT CẢ ĐÃ SẴN SÀNG - BÓP CÒ LONG TẠI POC!";
+                } else {
+                    banner.className = "w-full py-4 rounded-lg text-center font-bold text-xl bg-red-500 text-slate-900 border border-red-400 shadow-[0_0_20px_rgba(239,68,68,0.4)] transition-all duration-300 animate-pulse";
+                    banner.innerText = "✅ TẤT CẢ ĐÃ SẴN SÀNG - BÓP CÒ SHORT TẠI POC!";
+                }
+            } else {
+                if (selectedBias === 'LONG') {
+                    banner.className = "w-full py-4 rounded-lg text-center font-bold text-lg bg-emerald-900/40 text-emerald-400 border border-emerald-800 transition-all duration-300";
+                    banner.innerText = "ĐANG TÌM ĐIỂM LONG... (Hãy tick đủ các điều kiện)";
+                } else {
+                    banner.className = "w-full py-4 rounded-lg text-center font-bold text-lg bg-red-900/40 text-red-400 border border-red-800 transition-all duration-300";
+                    banner.innerText = "ĐANG TÌM ĐIỂM SHORT... (Hãy tick đủ các điều kiện)";
+                }
+            }
+        }
+
+        // Lưu dữ liệu vào LocalStorage
+        function saveData() {
+            const data = {
+                bias: null,
+                checks: {}
+            };
+            
+            for (const radio of radios) {
+                if (radio.checked) data.bias = radio.value;
+            }
+
+            checkboxes.forEach(id => {
+                data.checks[id] = document.getElementById(id).checked;
+            });
+
+            localStorage.setItem('quantTradingChecklist', JSON.stringify(data));
+            updateStatusBanner(); // Cập nhật banner mỗi khi tick
+        }
+
+        // Load dữ liệu từ LocalStorage
+        function loadData() {
+            const saved = localStorage.getItem('quantTradingChecklist');
+            if (saved) {
+                const data = JSON.parse(saved);
+                
+                // Khôi phục Bias
+                if (data.bias) {
+                    for (const radio of radios) {
+                        if (radio.value === data.bias) radio.checked = true;
+                    }
+                }
+
+                // Khôi phục Checkboxes
+                if (data.checks) {
+                    checkboxes.forEach(id => {
+                        if (data.checks[id] !== undefined) {
+                            document.getElementById(id).checked = data.checks[id];
+                        }
+                    });
+                }
+            }
+        }
+
+        // Reset toàn bộ form
+        function resetChecklist() {
+            for (const radio of radios) {
+                radio.checked = false;
+            }
+            checkboxes.forEach(id => {
+                document.getElementById(id).checked = false;
+            });
+            saveData();
+            updateBias();
+        }
+    </script>
+</body>
+</html>
