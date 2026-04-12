@@ -304,12 +304,22 @@
         }
 
         function generateAIPrompt(symbol, tf, lenA, lenB, total, price, vA, vB, rvol, accel, pDirB, pDirAll, dDirB, dDirAll, atrPct) {
-            const promptText = `Bạn là một chuyên gia Quant Trading xuất sắc, chuyên môn sâu về Order Flow, Volume Spread Analysis (VSA) và lý thuyết Wyckoff.
+            // Lấy thời gian UTC hiện tại
+            const now = new Date();
+            const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+            const dayOfWeek = days[now.getUTCDay()];
+            const utcTime = now.toISOString().substring(11, 16); // Lấy HH:mm
+            const utcDate = now.toISOString().substring(0, 10);  // Lấy YYYY-MM-DD
+
+            const promptText = `Bạn là một trader sử dụng phương pháp Order Flow, Volume Spread Analysis (VSA) và lý thuyết Wyckoff.
 
 Dưới đây là dữ liệu vi mô (Micro-structure) của cặp ${symbol} trên khung thời gian ${tf}. 
 Thị trường được chia làm 2 cửa sổ: 
 - Cửa sổ A (Dài hạn): ${lenA} nến trước đó.
 - Cửa sổ B (Ngắn hạn hiện tại): ${lenB} nến gần nhất.
+
+[BỐI CẢNH THỜI GIAN]
+* Thời gian hiện tại (Chuẩn UTC): ${dayOfWeek}, ngày ${utcDate} lúc ${utcTime} (Hãy cân nhắc yếu tố phiên giao dịch hoặc cuối tuần nếu có).
 
 [DỮ LIỆU ĐỊNH LƯỢNG]
 * Giá hiện tại: ${formatNumber(price)}
@@ -322,9 +332,10 @@ Thị trường được chia làm 2 cửa sổ:
 
 [YÊU CẦU PHÂN TÍCH]
 1. Không lặp lại các con số một cách máy móc. Hãy dịch chúng thành hành vi dòng tiền (Smart Money đang gom hàng, xả hàng, hay rũ bỏ?).
-2. Dựa vào RVOL và Gia tốc Volume, hãy đánh giá độ uy tín của Hướng Delta hiện tại.
-3. Sử dụng góc nhìn Wyckoff (Đang ở pha Tích lũy, Phân phối, hay Markup/Markdown?)
-4. Trả lời sắc bén, chia làm 3 phần:
+2. Đánh giá sự hợp lý của Volume dựa trên bối cảnh Thời gian (Giờ UTC, ngày trong tuần).
+3. Dựa vào RVOL và Gia tốc Volume, hãy đánh giá độ uy tín của Hướng Delta hiện tại.
+4. Sử dụng góc nhìn Wyckoff (Đang ở pha Tích lũy, Phân phối, hay Markup/Markdown?)
+5. Trả lời sắc bén, chia làm 3 phần:
    - BỨC TRANH DÒNG TIỀN (Tổng quan)
    - HÀNH VI VI MÔ (Nhận định cửa sổ B)
    - KHUYẾN NGHỊ HÀNH ĐỘNG (Kịch bản rủi ro).`;
