@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quant Dashboard - AI Co-Pilot Edition</title>
+    <title>Quant Dashboard - BYO-AI Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/ccxt@4.2.19/dist/ccxt.browser.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -22,32 +22,31 @@
             border: 1px solid #30363d;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
         }
-        input, select {
+        input, select, textarea {
             background-color: #010409;
             border: 1px solid #30363d;
             color: #c9d1d9;
         }
-        input:focus, select:focus {
+        input:focus, select:focus, textarea:focus {
             outline: none;
             border-color: #58a6ff;
         }
         .glow-text {
             text-shadow: 0 0 10px rgba(88, 166, 255, 0.5);
         }
+        /* Custom Scrollbar cho Textarea */
+        textarea::-webkit-scrollbar { width: 8px; }
+        textarea::-webkit-scrollbar-track { background: #010409; }
+        textarea::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+        textarea::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
     </style>
 </head>
 <body class="min-h-screen p-6">
 
     <div class="max-w-6xl mx-auto">
-        <header class="mb-8 border-b border-gray-700 pb-4 flex justify-between items-end">
-            <div>
-                <h1 class="text-3xl font-bold text-white tracking-wider glow-text">BINANCE QUANT DASHBOARD</h1>
-                <p class="text-sm text-gray-400 mt-2">Phân tích Order Flow, VWAP & Cố vấn AI (Gemini)</p>
-            </div>
-            <div class="w-64">
-                <label class="block text-xs font-semibold text-purple-400 uppercase mb-1">Gemini API Key</label>
-                <input type="password" id="apiKey" placeholder="Nhập API Key vào đây..." class="w-full px-2 py-1 text-sm rounded-md quant-font" value="AIzaSyD593g9sJtLQ7E0m1xiMwY0IWNmR7UOe8c">
-            </div>
+        <header class="mb-8 border-b border-gray-700 pb-4">
+            <h1 class="text-3xl font-bold text-white tracking-wider glow-text">BINANCE QUANT DASHBOARD</h1>
+            <p class="text-sm text-gray-400 mt-2">Phân tích Order Flow, VWAP & Trạm xuất Prompt cho AI (ChatGPT, Claude, Gemini...)</p>
         </header>
 
         <div class="card p-6 rounded-xl mb-8">
@@ -150,24 +149,27 @@
         </div>
 
         <div id="aiSection" class="mt-8 hidden">
-            <button id="aiBtn" onclick="getAIAnalysis()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-colors shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2">
-                <span>🤖 Yêu Cầu Cố Vấn AI Phân Tích (Order Flow & Wyckoff)</span>
-            </button>
-            
-            <div id="aiResultBox" class="mt-4 p-6 bg-[#010409] border border-purple-500/30 rounded-xl hidden">
-                <h3 class="text-lg font-bold text-purple-400 mb-4 border-b border-gray-800 pb-2">NHẬN ĐỊNH TỪ HỆ THỐNG:</h3>
-                <div id="aiContent" class="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap font-sans">
-                    Đang phân tích dữ liệu lượng tử...
+            <div class="card p-6 rounded-xl border border-purple-500/30 relative">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-purple-400">🤖 Trạm Xuất Prompt AI</h3>
+                        <p class="text-xs text-gray-400 mt-1">Copy đoạn văn bản dưới đây và dán vào ChatGPT, Claude, hoặc Gemini để nhận phân tích.</p>
+                    </div>
+                    <button id="copyBtn" onclick="copyPromptToClipboard()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-6 rounded-md transition-colors shadow-lg shadow-purple-500/20 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span>Copy Prompt</span>
+                    </button>
                 </div>
+                
+                <textarea id="aiPromptOutput" readonly class="w-full h-64 p-4 rounded-lg quant-font text-sm text-gray-300 resize-none leading-relaxed" spellcheck="false"></textarea>
             </div>
         </div>
     </div>
 
     <script>
         const exchange = new ccxt.binance({ enableRateLimit: true });
-
-        // Biến toàn cục để lưu Data gửi cho AI
-        let currentQuantData = {};
 
         function formatNumber(num, isFixedRatio = false) {
             if (num === 0) return "0";
@@ -196,7 +198,7 @@
                     buyVolume: parseFloat(d[9]), sellVolume: parseFloat(d[5]) - parseFloat(d[9])
                 }));
             } catch (e) {
-                alert("Lỗi tải dữ liệu Binance."); return [];
+                alert("Lỗi tải dữ liệu Binance. Kiểm tra lại mạng hoặc cặp coin."); return [];
             }
         }
 
@@ -242,7 +244,7 @@
                 status.innerText = "Lỗi dữ liệu trống."; btn.disabled = false; btn.classList.remove("opacity-50"); return;
             }
 
-            // Tính toán Math
+            // Math
             const avgVolA = dataA.reduce((sum, d) => sum + d.volume, 0) / dataA.length;
             const avgVolB = dataB.reduce((sum, d) => sum + d.volume, 0) / dataB.length;
             const rvol = avgVolA === 0 ? 0 : avgVolB / avgVolA;
@@ -282,7 +284,7 @@
             const currentPrice = allData[allData.length - 1].close;
             const vwAtrPct = (vwAtr / currentPrice) * 100;
 
-            // Update UI
+            // UI
             updateMainRatio('resRvol', rvol, rvol > 1 ? "🔥 " : "❄️ ");
             updateMainRatio('resVolAccel', volAccel, volAccel > 1 ? "🚀 " : "🐢 ");
             document.getElementById('resVwapA').innerText = formatNumber(vwapA, false);
@@ -292,112 +294,73 @@
             document.getElementById('resVwAtr').innerText = formatNumber(vwAtr, false);
             document.getElementById('resVwAtrPct').innerText = "(" + formatNumber(vwAtrPct, true) + "%)";
 
-            // LƯU DATA CHO AI
-            currentQuantData = {
-                Symbol: symbol,
-                Timeframe: timeframe,
-                TotalCandles: totalCandles,
-                WindowA_Candles: lenA,
-                WindowB_Candles: lenB,
-                CurrentPrice: currentPrice,
-                VWAP_A: vwapA,
-                VWAP_B: vwapB,
-                RVOL: rvol,
-                Vol_Acceleration: volAccel,
-                VW_Price_Direction_B: priceDirB,
-                VW_Price_Direction_Total: priceDirAll,
-                VW_Delta_Direction_B: vwDeltaB,
-                VW_Delta_Direction_Total: vwDeltaAll,
-                VW_ATR_Percentage: vwAtrPct
-            };
+            // GENERATE PROMPT
+            generateAIPrompt(symbol, timeframe, lenA, lenB, totalCandles, currentPrice, vwapA, vwapB, rvol, volAccel, priceDirB, priceDirAll, vwDeltaB, vwDeltaAll, vwAtrPct);
 
             document.getElementById('results').classList.remove("hidden");
-            document.getElementById('aiSection').classList.remove("hidden"); // Hiện nút AI
-            document.getElementById('aiResultBox').classList.add("hidden"); // Ẩn KQ cũ nếu có
+            document.getElementById('aiSection').classList.remove("hidden");
             status.innerText = `Đã tính toán xong dựa trên ${totalCandles} nến!`;
             btn.disabled = false; btn.classList.remove("opacity-50");
         }
 
-        // --- HÀM GỌI LLM GEMINI API (BẢN FIX DỨT ĐIỂM LỖI CẮT CHỮ) ---
-        async function getAIAnalysis() {
-            const apiKey = document.getElementById('apiKey').value.trim();
-            if (!apiKey) {
-                alert("Vui lòng nhập Gemini API Key ở góc phải trên cùng!");
-                return;
-            }
+        function generateAIPrompt(symbol, tf, lenA, lenB, total, price, vA, vB, rvol, accel, pDirB, pDirAll, dDirB, dDirAll, atrPct) {
+            const promptText = `Bạn là một chuyên gia Quant Trading xuất sắc, chuyên môn sâu về Order Flow, Volume Spread Analysis (VSA) và lý thuyết Wyckoff.
 
-            const aiBtn = document.getElementById('aiBtn');
-            const aiResultBox = document.getElementById('aiResultBox');
-            const aiContent = document.getElementById('aiContent');
+Dưới đây là dữ liệu vi mô (Micro-structure) của cặp ${symbol} trên khung thời gian ${tf}. 
+Thị trường được chia làm 2 cửa sổ: 
+- Cửa sổ A (Dài hạn): ${lenA} nến trước đó.
+- Cửa sổ B (Ngắn hạn hiện tại): ${lenB} nến gần nhất.
 
-            aiBtn.disabled = true;
-            aiBtn.classList.add("opacity-50", "animate-pulse");
-            aiBtn.innerText = "Đang kết nối với Cố vấn AI...";
-            aiResultBox.classList.remove("hidden");
-            aiContent.innerText = "AI đang xử lý các tham số lượng tử. Vui lòng đợi...";
+[DỮ LIỆU ĐỊNH LƯỢNG]
+* Giá hiện tại: ${formatNumber(price)}
+* VWAP (A): ${formatNumber(vA)} | VWAP (B): ${formatNumber(vB)}
+* RVOL (Vol trung bình B so với A): ${formatNumber(rvol, true)}
+* Gia tốc Volume (B so với cuối A): ${formatNumber(accel, true)}
+* Hướng Giá (VW-Price) riêng B: ${formatNumber(pDirB)} | Tổng (A+B): ${formatNumber(pDirAll)}
+* Hướng Delta (VW-Delta) riêng B: ${formatNumber(dDirB)} | Tổng (A+B): ${formatNumber(dDirAll)}
+* Mức độ biến động VW-ATR: ${formatNumber(atrPct, true)}%
 
-            const systemPrompt = `Bạn là một chuyên gia Quant Trading xuất sắc, chuyên môn sâu về Order Flow, Volume Spread Analysis (VSA) và lý thuyết Wyckoff.
+[YÊU CẦU PHÂN TÍCH]
+1. Không lặp lại các con số một cách máy móc. Hãy dịch chúng thành hành vi dòng tiền (Smart Money đang gom hàng, xả hàng, hay rũ bỏ?).
+2. Dựa vào RVOL và Gia tốc Volume, hãy đánh giá độ uy tín của Hướng Delta hiện tại.
+3. Sử dụng góc nhìn Wyckoff (Đang ở pha Tích lũy, Phân phối, hay Markup/Markdown?)
+4. Trả lời sắc bén, chia làm 3 phần:
+   - BỨC TRANH DÒNG TIỀN (Tổng quan)
+   - HÀNH VI VI MÔ (Nhận định cửa sổ B)
+   - KHUYẾN NGHỊ HÀNH ĐỘNG (Kịch bản rủi ro).`;
+
+            document.getElementById('aiPromptOutput').value = promptText;
             
-            Dưới đây là file dữ liệu JSON được trích xuất từ thuật toán định lượng chia thị trường làm 2 cửa sổ (A = Dài hạn, B = Ngắn hạn hiện tại).
+            // Reset nút copy
+            const copyBtn = document.getElementById('copyBtn');
+            copyBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span>Copy Prompt</span>
+            `;
+            copyBtn.classList.replace('bg-green-600', 'bg-purple-600');
+            copyBtn.classList.replace('hover:bg-green-500', 'hover:bg-purple-500');
+            copyBtn.classList.replace('shadow-green-500/20', 'shadow-purple-500/20');
+        }
+
+        function copyPromptToClipboard() {
+            const textarea = document.getElementById('aiPromptOutput');
+            textarea.select();
+            textarea.setSelectionRange(0, 99999); /* Dành cho mobile */
             
-            JSON Data:
-            ${JSON.stringify(currentQuantData, null, 2)}
-            
-            YÊU CẦU PHÂN TÍCH:
-            1. Không lặp lại các con số một cách máy móc. Hãy dịch chúng thành hành vi dòng tiền (Smart Money đang làm gì?).
-            2. Sử dụng góc nhìn Wyckoff (Đang ở pha Tích lũy, Phân phối, hay Markup/Markdown?) kết hợp Order Flow (Gia tốc khối lượng và Delta đang xác nhận hay phân kỳ với giá?).
-            3. Trả lời sắc bén, ngắn gọn, chia làm 3 phần rõ ràng:
-               - BỨC TRANH DÒNG TIỀN (Tổng quan cấu trúc)
-               - HÀNH VI VI MÔ (Nhận định cửa sổ B)
-               - KHUYẾN NGHỊ QUẢN TRỊ RỦI RO (Không đưa lời khuyên đầu tư tài chính trực tiếp, chỉ chỉ ra rủi ro hiện tại và hành động hợp logic Quant).
-               
-            Ghi chú: Format câu trả lời rõ ràng bằng gạch đầu dòng.`;
-
-            try {
-                // Gọi tới Endpoint mô hình Gemini 2.0 Flash mới nhất
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: systemPrompt }] }],
-                        generationConfig: {
-                            temperature: 0.2, // Giữ Temperature thấp để AI suy luận logic
-                            maxOutputTokens: 1500 // Mở rộng giới hạn từ để AI nói thoải mái
-                        }
-                    })
-                });
-
-                const rawData = await response.json();
-                
-                if (rawData.error) {
-                    throw new Error(rawData.error.message);
-                }
-
-                // Lấy text thô từ AI
-                const rawText = rawData.candidates[0].content.parts[0].text;
-                
-                // ---------------------------------------------------------
-                // BỘ LỌC BỌC THÉP: Chống trình duyệt nuốt chữ
-                // 1. Mã hóa toàn bộ dấu ngoặc nhọn (<, >) thành mã an toàn
-                let safeHTML = rawText.replace(/&/g, "&amp;")
-                                      .replace(/</g, "&lt;")
-                                      .replace(/>/g, "&gt;");
-
-                // 2. Chuyển đổi Markdown in đậm (**) thành thẻ HTML có màu tím
-                safeHTML = safeHTML.replace(/\*\*(.*?)\*\*/g, '<strong class="text-purple-400">$1</strong>');
-                // ---------------------------------------------------------
-
-                // Hiển thị ra màn hình
-                aiContent.innerHTML = safeHTML;
-
-            } catch (error) {
-                console.error(error);
-                aiContent.innerHTML = `<span class="text-red-500">Lỗi khi gọi AI: ${error.message}</span>`;
-            } finally {
-                aiBtn.disabled = false;
-                aiBtn.classList.remove("opacity-50", "animate-pulse");
-                aiBtn.innerHTML = `<span>🤖 Yêu Cầu Cố Vấn AI Phân Tích Lại</span>`;
-            }
+            navigator.clipboard.writeText(textarea.value).then(() => {
+                const copyBtn = document.getElementById('copyBtn');
+                copyBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Đã Copy!</span>
+                `;
+                copyBtn.classList.replace('bg-purple-600', 'bg-green-600');
+                copyBtn.classList.replace('hover:bg-purple-500', 'hover:bg-green-500');
+                copyBtn.classList.replace('shadow-purple-500/20', 'shadow-green-500/20');
+            });
         }
     </script>
 </body>
