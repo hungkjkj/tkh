@@ -39,6 +39,15 @@
         textarea::-webkit-scrollbar-track { background: #010409; }
         textarea::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
         textarea::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
+        
+        /* Hiệu ứng nhấp nháy nhẹ cho ô Giá Hiện Tại */
+        .price-flash {
+            animation: flash 1s ease-out;
+        }
+        @keyframes flash {
+            0% { background-color: rgba(88, 166, 255, 0.2); }
+            100% { background-color: transparent; }
+        }
     </style>
 </head>
 <body class="min-h-screen p-6">
@@ -71,7 +80,7 @@
                     <label class="block text-xs font-semibold text-blue-400 uppercase mb-2">Cửa sổ A (Quá khứ)</label>
                     <div class="flex items-center justify-between">
                         <span class="text-sm text-gray-400">Số nến:</span>
-                        <input type="number" id="lengthA" value="300" min="1" max="999" class="w-24 px-2 py-1 rounded quant-font font-bold text-center">
+                        <input type="number" id="lengthA" value="720" min="1" max="2000" class="w-24 px-2 py-1 rounded quant-font font-bold text-center">
                     </div>
                 </div>
 
@@ -79,15 +88,23 @@
                     <label class="block text-xs font-semibold text-yellow-400 uppercase mb-2">Cửa sổ B (Hiện tại)</label>
                     <div class="flex items-center justify-between">
                         <span class="text-sm text-gray-400">Số nến:</span>
-                        <input type="number" id="lengthB" value="40" min="1" max="999" class="w-24 px-2 py-1 rounded quant-font font-bold text-center">
+                        <input type="number" id="lengthB" value="96" min="1" max="1000" class="w-24 px-2 py-1 rounded quant-font font-bold text-center">
                     </div>
                 </div>
             </div>
 
             <div class="mt-6 flex items-center justify-between">
-                <button id="calcBtn" onclick="runAnalysis()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-md transition-colors shadow-lg shadow-blue-500/20">
-                    Phân Tích Số Liệu
-                </button>
+                <div class="flex items-center gap-6">
+                    <button id="calcBtn" onclick="runAnalysis()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-md transition-colors shadow-lg shadow-blue-500/20">
+                        Phân Tích Số Liệu
+                    </button>
+                    
+                    <div id="currentPriceContainer" class="hidden flex items-center gap-3 px-4 py-2 bg-[#010409] border border-gray-700 rounded-lg">
+                        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Giá Hiện Tại:</span>
+                        <span id="currentPriceDisplay" class="text-xl font-bold quant-font text-white">---</span>
+                    </div>
+                </div>
+
                 <div id="status" class="text-sm quant-font text-gray-400">Sẵn sàng.</div>
             </div>
         </div>
@@ -151,9 +168,12 @@
         <div id="aiSection" class="mt-8 hidden">
             <div class="card p-6 rounded-xl border border-purple-500/30 relative">
                 <div class="flex justify-between items-center mb-4">
-                    <div>
-                        <h3 class="text-lg font-bold text-purple-400">🤖 Trạm Xuất Prompt AI</h3>
-                        <p class="text-xs text-gray-400 mt-1">Copy đoạn văn bản dưới đây và dán vào ChatGPT, Claude, hoặc Gemini để nhận phân tích.</p>
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">🤖</span>
+                        <div>
+                            <h3 class="text-lg font-bold text-purple-400">Trạm Xuất Prompt AI</h3>
+                            <p class="text-xs text-gray-400 mt-1">Copy đoạn văn bản dưới đây và dán vào ChatGPT, Claude, hoặc Gemini để nhận phân tích.</p>
+                        </div>
                     </div>
                     <button id="copyBtn" onclick="copyPromptToClipboard()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-6 rounded-md transition-colors shadow-lg shadow-purple-500/20 flex items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -170,6 +190,9 @@
 
     <script>
         const exchange = new ccxt.binance({ enableRateLimit: true });
+
+        // Biến lưu giá cũ để so sánh màu (Xanh/Đỏ)
+        let previousPrice = null;
 
         function formatNumber(num, isFixedRatio = false) {
             if (num === 0) return "0";
@@ -189,16 +212,26 @@
         async function fetchBinanceDataByLimit(symbol, timeframe, limit) {
             const formattedSymbol = symbol.replace('/', '').toUpperCase();
             try {
-                const response = await exchange.publicGetKlines({
-                    symbol: formattedSymbol, interval: timeframe, limit: limit
+                // Tăng giới hạn nếu cần lấy hơn 1000 nến (Binance hỗ trợ API lấy max 1000 nến/lần, 
+                // nếu cần nhiều hơn phải gọi nhiều lần, nhưng ở đây ta dùng CCXT mặc định xử lý)
+                const response = await exchange.fetchOHLCV(formattedSymbol, timeframe, undefined, limit);
+                
+                // Mẹo Quant: Lấy lại Buy Volume qua implicit call nếu CCXT ko trả về
+                const rawResponse = await exchange.publicGetKlines({
+                    symbol: formattedSymbol.replace('/', ''),
+                    interval: timeframe,
+                    limit: limit
                 });
-                return response.map(d => ({
+
+                return rawResponse.map(d => ({
                     timestamp: parseInt(d[0]), open: parseFloat(d[1]), high: parseFloat(d[2]),
                     low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5]),
                     buyVolume: parseFloat(d[9]), sellVolume: parseFloat(d[5]) - parseFloat(d[9])
                 }));
             } catch (e) {
-                alert("Lỗi tải dữ liệu Binance. Kiểm tra lại mạng hoặc cặp coin."); return [];
+                console.error(e);
+                alert("Lỗi tải dữ liệu Binance. Cặp coin có thể sai hoặc mạng có vấn đề."); 
+                return [];
             }
         }
 
@@ -224,6 +257,32 @@
             el.className = "text-lg font-bold quant-font " + (value > 0 ? "text-green-500" : (value < 0 ? "text-red-500" : "text-gray-400"));
         }
 
+        function updateCurrentPriceDisplay(price) {
+            const container = document.getElementById('currentPriceContainer');
+            const display = document.getElementById('currentPriceDisplay');
+            
+            container.classList.remove('hidden');
+            
+            // Xóa hiệu ứng cũ để chạy lại hiệu ứng nhấp nháy
+            container.classList.remove('price-flash');
+            void container.offsetWidth; // Trigger reflow
+            container.classList.add('price-flash');
+
+            display.innerText = formatNumber(price);
+
+            // Đổi màu dựa trên giá tăng/giảm so với lần trước
+            if (previousPrice !== null) {
+                if (price > previousPrice) {
+                    display.className = "text-xl font-bold quant-font text-green-400";
+                } else if (price < previousPrice) {
+                    display.className = "text-xl font-bold quant-font text-red-400";
+                } else {
+                    display.className = "text-xl font-bold quant-font text-white";
+                }
+            }
+            previousPrice = price;
+        }
+
         async function runAnalysis() {
             const status = document.getElementById('status');
             const btn = document.getElementById('calcBtn');
@@ -231,17 +290,31 @@
             const timeframe = document.getElementById('timeframe').value;
             const lenA = parseInt(document.getElementById('lengthA').value);
             const lenB = parseInt(document.getElementById('lengthB').value);
+            
+            if (isNaN(lenA) || isNaN(lenB) || lenA <= 0 || lenB <= 0) {
+                alert("Vui lòng nhập số nến hợp lệ."); return;
+            }
+
             const totalCandles = lenA + lenB;
+            if (totalCandles > 1000) {
+                alert(`Binance API Klines giới hạn tối đa 1000 nến cho mỗi lần tải. Bạn đang yêu cầu ${totalCandles}. Vui lòng giảm tổng số nến A+B xuống dưới 1000.`);
+                return;
+            }
 
             status.innerText = `Đang tải ${totalCandles} nến...`;
             btn.disabled = true; btn.classList.add("opacity-50");
 
             const allData = await fetchBinanceDataByLimit(symbol, timeframe, totalCandles);
+            
+            if (allData.length < totalCandles) {
+                status.innerText = `Cảnh báo: Chỉ lấy được ${allData.length} nến.`;
+            }
+
             const dataA = allData.slice(0, allData.length - lenB);
             const dataB = allData.slice(-lenB);
 
             if (dataA.length === 0 || dataB.length === 0) {
-                status.innerText = "Lỗi dữ liệu trống."; btn.disabled = false; btn.classList.remove("opacity-50"); return;
+                status.innerText = "Lỗi: Không đủ dữ liệu."; btn.disabled = false; btn.classList.remove("opacity-50"); return;
             }
 
             // Math
@@ -285,6 +358,7 @@
             const vwAtrPct = (vwAtr / currentPrice) * 100;
 
             // UI
+            updateCurrentPriceDisplay(currentPrice); // Hiển thị giá hiện tại
             updateMainRatio('resRvol', rvol, rvol > 1 ? "🔥 " : "❄️ ");
             updateMainRatio('resVolAccel', volAccel, volAccel > 1 ? "🚀 " : "🐢 ");
             document.getElementById('resVwapA').innerText = formatNumber(vwapA, false);
@@ -299,19 +373,18 @@
 
             document.getElementById('results').classList.remove("hidden");
             document.getElementById('aiSection').classList.remove("hidden");
-            status.innerText = `Đã tính toán xong dựa trên ${totalCandles} nến!`;
+            status.innerText = `Đã tính toán xong dựa trên ${allData.length} nến!`;
             btn.disabled = false; btn.classList.remove("opacity-50");
         }
 
         function generateAIPrompt(symbol, tf, lenA, lenB, total, price, vA, vB, rvol, accel, pDirB, pDirAll, dDirB, dDirAll, atrPct) {
-            // Lấy thời gian UTC hiện tại
             const now = new Date();
             const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
             const dayOfWeek = days[now.getUTCDay()];
-            const utcTime = now.toISOString().substring(11, 16); // Lấy HH:mm
-            const utcDate = now.toISOString().substring(0, 10);  // Lấy YYYY-MM-DD
+            const utcTime = now.toISOString().substring(11, 16); 
+            const utcDate = now.toISOString().substring(0, 10);  
 
-            const promptText = `Bạn là một trader sử dụng phương pháp Order Flow, Volume Spread Analysis (VSA) và lý thuyết Wyckoff.
+            const promptText = `Bạn là một chuyên gia Quant Trading xuất sắc, chuyên môn sâu về Order Flow, Volume Spread Analysis (VSA) và lý thuyết Wyckoff.
 
 Dưới đây là dữ liệu vi mô (Micro-structure) của cặp ${symbol} trên khung thời gian ${tf}. 
 Thị trường được chia làm 2 cửa sổ: 
@@ -342,7 +415,6 @@ Thị trường được chia làm 2 cửa sổ:
 
             document.getElementById('aiPromptOutput').value = promptText;
             
-            // Reset nút copy
             const copyBtn = document.getElementById('copyBtn');
             copyBtn.innerHTML = `
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -358,7 +430,7 @@ Thị trường được chia làm 2 cửa sổ:
         function copyPromptToClipboard() {
             const textarea = document.getElementById('aiPromptOutput');
             textarea.select();
-            textarea.setSelectionRange(0, 99999); /* Dành cho mobile */
+            textarea.setSelectionRange(0, 99999); 
             
             navigator.clipboard.writeText(textarea.value).then(() => {
                 const copyBtn = document.getElementById('copyBtn');
