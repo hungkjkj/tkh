@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quant Dashboard - BYO-AI Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/ccxt@4.2.19/dist/ccxt.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: 'Inter', sans-serif;
+        }
+        .quant-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+        input, select, textarea {
+            background-color: #010409;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #58a6ff;
+        }
+        .glow-text {
+            text-shadow: 0 0 10px rgba(88, 166, 255, 0.5);
+        }
+        /* Custom Scrollbar cho Textarea */
+        textarea::-webkit-scrollbar { width: 8px; }
+        textarea::-webkit-scrollbar-track { background: #010409; }
+        textarea::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+        textarea::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
+        
+        /* Hiệu ứng nhấp nháy nhẹ cho ô Giá Hiện Tại */
+        .price-flash {
+            animation: flash 1s ease-out;
+        }
+        @keyframes flash {
+            0% { background-color: rgba(88, 166, 255, 0.2); }
+            100% { background-color: transparent; }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-6">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 border-b border-gray-700 pb-4">
+            <h1 class="text-3xl font-bold text-white tracking-wider glow-text">BINANCE QUANT DASHBOARD</h1>
+            <p class="text-sm text-gray-400 mt-2">Phân tích Order Flow, VWAP & Trạm xuất Prompt cho AI (ChatGPT, Claude, Gemini...)</p>
+        </header>
+
+        <div class="card p-6 rounded-xl mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-2">Cặp Giao Dịch</label>
+                    <input type="text" id="symbol" value="BTC/USDT" class="w-full px-3 py-2 rounded-md quant-font font-bold text-lg text-center uppercase">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-2">Khung Thời Gian</label>
+                    <select id="timeframe" class="w-full px-3 py-2 rounded-md quant-font font-bold text-lg text-center">
+                        <option value="1m">1m</option>
+                        <option value="5m">5m</option>
+                        <option value="15m" selected>15m</option>
+                        <option value="1h">1h</option>
+                        <option value="4h">4h</option>
+                        <option value="1d">1d</option>
+                    </select>
+                </div>
+                
+                <div class="bg-gray-900 border border-gray-700 rounded-lg p-3">
+                    <label class="block text-xs font-semibold text-blue-400 uppercase mb-2">Cửa sổ A (Quá khứ)</label>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-400">Số nến:</span>
+                        <input type="number" id="lengthA" value="720" min="1" max="2000" class="w-24 px-2 py-1 rounded quant-font font-bold text-center">
+                    </div>
+                </div>
+
+                <div class="bg-gray-900 border border-gray-700 rounded-lg p-3">
+                    <label class="block text-xs font-semibold text-yellow-400 uppercase mb-2">Cửa sổ B (Hiện tại)</label>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-400">Số nến:</span>
+                        <input type="number" id="lengthB" value="96" min="1" max="1000" class="w-24 px-2 py-1 rounded quant-font font-bold text-center">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex items-center justify-between">
+                <div class="flex items-center gap-6">
+                    <button id="calcBtn" onclick="runAnalysis()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-md transition-colors shadow-lg shadow-blue-500/20">
+                        Phân Tích Số Liệu
+                    </button>
+                    
+                    <div id="currentPriceContainer" class="hidden flex items-center gap-3 px-4 py-2 bg-[#010409] border border-gray-700 rounded-lg">
+                        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Giá Hiện Tại:</span>
+                        <span id="currentPriceDisplay" class="text-xl font-bold quant-font text-white">---</span>
+                    </div>
+                </div>
+
+                <div id="status" class="text-sm quant-font text-gray-400">Sẵn sàng.</div>
+            </div>
+        </div>
+
+        <div id="results" class="grid grid-cols-1 md:grid-cols-3 gap-6 hidden">
+            <div class="card p-6 rounded-xl flex flex-col items-center justify-center text-center">
+                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">RVOL (Vol B / Vol A)</h4>
+                <div id="resRvol" class="text-4xl font-bold quant-font mt-2">-</div>
+            </div>
+
+            <div class="card p-6 rounded-xl flex flex-col items-center justify-center text-center">
+                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Gia tốc khối lượng</h4>
+                <div id="resVolAccel" class="text-4xl font-bold quant-font mt-2">-</div>
+            </div>
+
+            <div class="card p-6 rounded-xl flex flex-col justify-center">
+                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 text-center">VWAP Độc Lập</h4>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm text-gray-400">Cửa sổ B:</span>
+                    <span id="resVwapB" class="text-lg font-bold quant-font text-purple-400">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-400">Cửa sổ A:</span>
+                    <span id="resVwapA" class="text-lg font-bold quant-font text-purple-400">-</span>
+                </div>
+            </div>
+
+            <div class="card p-6 rounded-xl flex flex-col justify-center">
+                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 text-center">Hướng Giá (VW-Price)</h4>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm text-gray-400">Riêng Cửa Sổ B:</span>
+                    <span id="resPriceDirB" class="text-lg font-bold quant-font">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-400">Tổng (A + B):</span>
+                    <span id="resPriceDirAll" class="text-lg font-bold quant-font">-</span>
+                </div>
+            </div>
+
+            <div class="card p-6 rounded-xl flex flex-col justify-center">
+                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 text-center">Hướng Delta (VW-Delta)</h4>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm text-gray-400">Riêng Cửa Sổ B:</span>
+                    <span id="resDeltaB" class="text-lg font-bold quant-font">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-400">Tổng (A + B):</span>
+                    <span id="resDeltaAll" class="text-lg font-bold quant-font">-</span>
+                </div>
+            </div>
+
+            <div class="card p-6 rounded-xl flex flex-col items-center justify-center text-center">
+                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Biến Động (VW-ATR)</h4>
+                <div class="flex items-end gap-2 mt-2">
+                    <div id="resVwAtr" class="text-3xl font-bold quant-font text-blue-300">-</div>
+                    <div id="resVwAtrPct" class="text-lg font-semibold quant-font text-gray-500 mb-1">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="aiSection" class="mt-8 hidden">
+            <div class="card p-6 rounded-xl border border-purple-500/30 relative">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">🤖</span>
+                        <div>
+                            <h3 class="text-lg font-bold text-purple-400">Trạm Xuất Prompt AI</h3>
+                            <p class="text-xs text-gray-400 mt-1">Copy đoạn văn bản dưới đây và dán vào ChatGPT, Claude, hoặc Gemini để nhận phân tích.</p>
+                        </div>
+                    </div>
+                    <button id="copyBtn" onclick="copyPromptToClipboard()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-6 rounded-md transition-colors shadow-lg shadow-purple-500/20 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span>Copy Prompt</span>
+                    </button>
+                </div>
+                
+                <textarea id="aiPromptOutput" readonly class="w-full h-64 p-4 rounded-lg quant-font text-sm text-gray-300 resize-none leading-relaxed" spellcheck="false"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const exchange = new ccxt.binance({ enableRateLimit: true });
+
+        // Biến lưu giá cũ để so sánh màu (Xanh/Đỏ)
+        let previousPrice = null;
+
+        function formatNumber(num, isFixedRatio = false) {
+            if (num === 0) return "0";
+            if (isFixedRatio) return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            const absNum = Math.abs(num);
+            let decimals = 2;
+            if (absNum < 0.000001) decimals = 10;
+            else if (absNum < 0.0001) decimals = 8;
+            else if (absNum < 0.01) decimals = 6;
+            else if (absNum < 1) decimals = 4;
+            else decimals = 2;
+
+            return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: decimals });
+        }
+
+        async function fetchBinanceDataByLimit(symbol, timeframe, limit) {
+            const formattedSymbol = symbol.replace('/', '').toUpperCase();
+            try {
+                // Tăng giới hạn nếu cần lấy hơn 1000 nến (Binance hỗ trợ API lấy max 1000 nến/lần, 
+                // nếu cần nhiều hơn phải gọi nhiều lần, nhưng ở đây ta dùng CCXT mặc định xử lý)
+                const response = await exchange.fetchOHLCV(formattedSymbol, timeframe, undefined, limit);
+                
+                // Mẹo Quant: Lấy lại Buy Volume qua implicit call nếu CCXT ko trả về
+                const rawResponse = await exchange.publicGetKlines({
+                    symbol: formattedSymbol.replace('/', ''),
+                    interval: timeframe,
+                    limit: limit
+                });
+
+                return rawResponse.map(d => ({
+                    timestamp: parseInt(d[0]), open: parseFloat(d[1]), high: parseFloat(d[2]),
+                    low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5]),
+                    buyVolume: parseFloat(d[9]), sellVolume: parseFloat(d[5]) - parseFloat(d[9])
+                }));
+            } catch (e) {
+                console.error(e);
+                alert("Lỗi tải dữ liệu Binance. Cặp coin có thể sai hoặc mạng có vấn đề."); 
+                return [];
+            }
+        }
+
+        function calculateVWAP(data) {
+            let cumVol = 0; let cumVolPrice = 0;
+            data.forEach(d => {
+                const typicalPrice = (d.high + d.low + d.close) / 3;
+                cumVol += d.volume; cumVolPrice += typicalPrice * d.volume;
+            });
+            return cumVol === 0 ? 0 : cumVolPrice / cumVol;
+        }
+
+        function updateMainRatio(id, value, prefix = "") {
+            const el = document.getElementById(id);
+            el.innerText = prefix + formatNumber(value, true); 
+            el.className = "text-4xl font-bold quant-font mt-2 " + (value > 1 ? "text-green-500" : (value < 1 ? "text-red-500" : "text-gray-400"));
+        }
+
+        function setSubMetric(id, value) {
+            const el = document.getElementById(id);
+            const prefix = value > 0 ? "+" : "";
+            el.innerText = prefix + formatNumber(value, false);
+            el.className = "text-lg font-bold quant-font " + (value > 0 ? "text-green-500" : (value < 0 ? "text-red-500" : "text-gray-400"));
+        }
+
+        function updateCurrentPriceDisplay(price) {
+            const container = document.getElementById('currentPriceContainer');
+            const display = document.getElementById('currentPriceDisplay');
+            
+            container.classList.remove('hidden');
+            
+            // Xóa hiệu ứng cũ để chạy lại hiệu ứng nhấp nháy
+            container.classList.remove('price-flash');
+            void container.offsetWidth; // Trigger reflow
+            container.classList.add('price-flash');
+
+            display.innerText = formatNumber(price);
+
+            // Đổi màu dựa trên giá tăng/giảm so với lần trước
+            if (previousPrice !== null) {
+                if (price > previousPrice) {
+                    display.className = "text-xl font-bold quant-font text-green-400";
+                } else if (price < previousPrice) {
+                    display.className = "text-xl font-bold quant-font text-red-400";
+                } else {
+                    display.className = "text-xl font-bold quant-font text-white";
+                }
+            }
+            previousPrice = price;
+        }
+
+        async function runAnalysis() {
+            const status = document.getElementById('status');
+            const btn = document.getElementById('calcBtn');
+            const symbol = document.getElementById('symbol').value;
+            const timeframe = document.getElementById('timeframe').value;
+            const lenA = parseInt(document.getElementById('lengthA').value);
+            const lenB = parseInt(document.getElementById('lengthB').value);
+            
+            if (isNaN(lenA) || isNaN(lenB) || lenA <= 0 || lenB <= 0) {
+                alert("Vui lòng nhập số nến hợp lệ."); return;
+            }
+
+            const totalCandles = lenA + lenB;
+            if (totalCandles > 1000) {
+                alert(`Binance API Klines giới hạn tối đa 1000 nến cho mỗi lần tải. Bạn đang yêu cầu ${totalCandles}. Vui lòng giảm tổng số nến A+B xuống dưới 1000.`);
+                return;
+            }
+
+            status.innerText = `Đang tải ${totalCandles} nến...`;
+            btn.disabled = true; btn.classList.add("opacity-50");
+
+            // BƯỚC FIX 1: Tải dư 1 nến để phòng hờ nến hiện tại chưa đóng
+            const rawData = await fetchBinanceDataByLimit(symbol, timeframe, totalCandles + 1);
+            
+            if (rawData.length > 0) {
+                // BƯỚC FIX 2: Vứt bỏ nến cuối cùng (nến đang chạy) khỏi mảng
+                rawData.pop(); 
+            }
+            
+            const allData = rawData; // Gán lại vào allData để tính toán
+
+            if (allData.length < totalCandles) {
+                status.innerText = `Cảnh báo: Chỉ lấy được ${allData.length} nến.`;
+            }
+
+            const dataA = allData.slice(0, allData.length - lenB);
+            const dataB = allData.slice(-lenB);
+
+            if (dataA.length === 0 || dataB.length === 0) {
+                status.innerText = "Lỗi: Không đủ dữ liệu."; btn.disabled = false; btn.classList.remove("opacity-50"); return;
+            }
+
+            // Math
+            const avgVolA = dataA.reduce((sum, d) => sum + d.volume, 0) / dataA.length;
+            const avgVolB = dataB.reduce((sum, d) => sum + d.volume, 0) / dataB.length;
+            const rvol = avgVolA === 0 ? 0 : avgVolB / avgVolA;
+
+            const sumVolB = dataB.reduce((sum, d) => sum + d.volume, 0);
+            const sumVolLastNofA = dataA.slice(-dataB.length).reduce((sum, d) => sum + d.volume, 0);
+            const volAccel = sumVolLastNofA === 0 ? 0 : sumVolB / sumVolLastNofA;
+
+            const vwapA = calculateVWAP(dataA); const vwapB = calculateVWAP(dataB);
+
+            let sumWdB_num = 0, sumWdB_den = 0, weightedPriceMoveB = 0;
+            dataB.forEach(d => {
+                const delta = d.buyVolume - d.sellVolume;
+                sumWdB_num += (delta * d.volume); sumWdB_den += d.volume;
+                weightedPriceMoveB += (d.close - d.open) * d.volume;
+            });
+            const vwDeltaB = sumWdB_den === 0 ? 0 : (sumWdB_num / sumWdB_den);
+            const priceDirB = sumWdB_den === 0 ? 0 : (weightedPriceMoveB / sumWdB_den);
+
+            let totalVolCombined = 0, weightedPriceMoveAll = 0, sumWdAll_num = 0, cumWeightedTR = 0;
+            for (let i = 0; i < allData.length; i++) {
+                const d = allData[i]; totalVolCombined += d.volume;
+                weightedPriceMoveAll += (d.close - d.open) * d.volume; 
+                sumWdAll_num += ((d.buyVolume - d.sellVolume) * d.volume);
+
+                let tr = d.high - d.low; 
+                if (i > 0) {
+                    const prevClose = allData[i - 1].close;
+                    tr = Math.max(d.high - d.low, Math.abs(d.high - prevClose), Math.abs(d.low - prevClose));
+                }
+                cumWeightedTR += (tr * d.volume);
+            }
+
+            const priceDirAll = totalVolCombined === 0 ? 0 : (weightedPriceMoveAll / totalVolCombined);
+            const vwDeltaAll = totalVolCombined === 0 ? 0 : (sumWdAll_num / totalVolCombined);
+            const vwAtr = totalVolCombined === 0 ? 0 : (cumWeightedTR / totalVolCombined);
+            // Gọi trực tiếp giá Ticker realtime từ Binance qua CCXT thay vì lấy từ nến cũ
+            const ticker = await exchange.fetchTicker(symbol);
+            const currentPrice = ticker.last;
+            const vwAtrPct = (vwAtr / currentPrice) * 100;
+
+            // UI
+            updateCurrentPriceDisplay(currentPrice); // Hiển thị giá hiện tại
+            updateMainRatio('resRvol', rvol, rvol > 1 ? "🔥 " : "❄️ ");
+            updateMainRatio('resVolAccel', volAccel, volAccel > 1 ? "🚀 " : "🐢 ");
+            document.getElementById('resVwapA').innerText = formatNumber(vwapA, false);
+            document.getElementById('resVwapB').innerText = formatNumber(vwapB, false);
+            setSubMetric('resPriceDirB', priceDirB); setSubMetric('resPriceDirAll', priceDirAll);
+            setSubMetric('resDeltaB', vwDeltaB); setSubMetric('resDeltaAll', vwDeltaAll);
+            document.getElementById('resVwAtr').innerText = formatNumber(vwAtr, false);
+            document.getElementById('resVwAtrPct').innerText = "(" + formatNumber(vwAtrPct, true) + "%)";
+
+            // GENERATE PROMPT
+            generateAIPrompt(symbol, timeframe, lenA, lenB, totalCandles, currentPrice, vwapA, vwapB, rvol, volAccel, priceDirB, priceDirAll, vwDeltaB, vwDeltaAll, vwAtrPct, vwAtr);
+
+            document.getElementById('results').classList.remove("hidden");
+            document.getElementById('aiSection').classList.remove("hidden");
+            status.innerText = `Đã tính toán xong dựa trên ${allData.length} nến!`;
+            btn.disabled = false; btn.classList.remove("opacity-50");
+        }
+
+        function generateAIPrompt(symbol, tf, lenA, lenB, total, price, vA, vB, rvol, accel, pDirB, pDirAll, dDirB, dDirAll, atrPct, atr) {
+            const now = new Date();
+            const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+            const dayOfWeek = days[now.getUTCDay()];
+            const utcTime = now.toISOString().substring(11, 16); 
+            const utcDate = now.toISOString().substring(0, 10);  
+
+            const promptText = `Bạn là một chuyên gia Quant Trading xuất sắc, chuyên môn sâu về Order Flow, Volume Spread Analysis (VSA) và lý thuyết Wyckoff.
+
+Dưới đây là dữ liệu vi mô (Micro-structure) của cặp ${symbol} trên khung thời gian ${tf}. 
+Thị trường được chia làm 2 cửa sổ: 
+- Cửa sổ A (Dài hạn): ${lenA} nến trước đó.
+- Cửa sổ B (Ngắn hạn hiện tại): ${lenB} nến gần nhất.
+
+[BỐI CẢNH THỜI GIAN]
+* Thời gian hiện tại (Chuẩn UTC): ${dayOfWeek}, ngày ${utcDate} lúc ${utcTime} (Hãy cân nhắc yếu tố phiên giao dịch hoặc cuối tuần nếu có).
+
+[DỮ LIỆU ĐỊNH LƯỢNG]
+* Giá hiện tại: ${formatNumber(price)}
+* VWAP (A): ${formatNumber(vA)} | VWAP (B): ${formatNumber(vB)}
+* RVOL (Vol trung bình B so với A): ${formatNumber(rvol, true)}
+* Gia tốc Volume (B so với cuối A): ${formatNumber(accel, true)}
+* Hướng Giá (VW-Price) riêng B: ${formatNumber(pDirB)} | Tổng (A+B): ${formatNumber(pDirAll)}
+* Hướng Delta (VW-Delta) riêng B: ${formatNumber(dDirB)} | Tổng (A+B): ${formatNumber(dDirAll)}
+* Mức độ biến động VW-ATR: ${formatNumber(atr, true)} (${formatNumber(atrPct, true)}%)
+
+[YÊU CẦU PHÂN TÍCH]
+1. Không lặp lại các con số một cách máy móc. Hãy dịch chúng thành hành vi dòng tiền (Smart Money đang gom hàng, xả hàng, hay rũ bỏ?).
+2. Đánh giá sự hợp lý của Volume dựa trên bối cảnh Thời gian (Giờ UTC, ngày trong tuần).
+3. Dựa vào RVOL và Gia tốc Volume, hãy đánh giá độ uy tín của Hướng Delta hiện tại.
+4. Sử dụng góc nhìn Wyckoff (Đang ở pha Tích lũy, Phân phối, hay Markup/Markdown?)
+5. Trả lời sắc bén, chia làm 3 phần:
+   - BỨC TRANH DÒNG TIỀN (Tổng quan)
+   - HÀNH VI VI MÔ (Nhận định cửa sổ B)
+   - KHUYẾN NGHỊ HÀNH ĐỘNG (Kịch bản rủi ro).`;
+
+            document.getElementById('aiPromptOutput').value = promptText;
+            
+            const copyBtn = document.getElementById('copyBtn');
+            copyBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span>Copy Prompt</span>
+            `;
+            copyBtn.classList.replace('bg-green-600', 'bg-purple-600');
+            copyBtn.classList.replace('hover:bg-green-500', 'hover:bg-purple-500');
+            copyBtn.classList.replace('shadow-green-500/20', 'shadow-purple-500/20');
+        }
+
+        function copyPromptToClipboard() {
+            const textarea = document.getElementById('aiPromptOutput');
+            textarea.select();
+            textarea.setSelectionRange(0, 99999); 
+            
+            navigator.clipboard.writeText(textarea.value).then(() => {
+                const copyBtn = document.getElementById('copyBtn');
+                copyBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Đã Copy!</span>
+                `;
+                copyBtn.classList.replace('bg-purple-600', 'bg-green-600');
+                copyBtn.classList.replace('hover:bg-purple-500', 'hover:bg-green-500');
+                copyBtn.classList.replace('shadow-purple-500/20', 'shadow-green-500/20');
+            });
+        }
+    </script>
+</body>
+</html>
