@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quant Dashboard - BYO-AI Edition</title>
+    <title>Quant Dashboard - Dynamic VP Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/ccxt@4.2.19/dist/ccxt.browser.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -34,16 +34,11 @@
         .glow-text {
             text-shadow: 0 0 10px rgba(88, 166, 255, 0.5);
         }
-        /* Custom Scrollbar cho Textarea */
         textarea::-webkit-scrollbar { width: 8px; }
         textarea::-webkit-scrollbar-track { background: #010409; }
         textarea::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
         textarea::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
-        
-        /* Hiệu ứng nhấp nháy nhẹ cho ô Giá Hiện Tại */
-        .price-flash {
-            animation: flash 1s ease-out;
-        }
+        .price-flash { animation: flash 1s ease-out; }
         @keyframes flash {
             0% { background-color: rgba(88, 166, 255, 0.2); }
             100% { background-color: transparent; }
@@ -55,7 +50,7 @@
     <div class="max-w-6xl mx-auto">
         <header class="mb-8 border-b border-gray-700 pb-4">
             <h1 class="text-3xl font-bold text-white tracking-wider glow-text">BINANCE QUANT DASHBOARD</h1>
-            <p class="text-sm text-gray-400 mt-2">Phân tích Order Flow, VWAP & Trạm xuất Prompt cho AI (ChatGPT, Claude, Gemini...)</p>
+            <p class="text-sm text-gray-400 mt-2">Phân tích Order Flow, VWAP & Dynamic Volume Profile</p>
         </header>
 
         <div class="card p-6 rounded-xl mb-8">
@@ -110,6 +105,30 @@
         </div>
 
         <div id="results" class="grid grid-cols-1 md:grid-cols-3 gap-6 hidden">
+            <div class="card p-6 rounded-xl flex flex-col justify-center border-l-4 border-l-purple-500 col-span-1 md:col-span-3 bg-gradient-to-r from-[#161b22] to-[#0d1117]">
+                <h4 class="text-xs font-semibold text-purple-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                    Bản đồ Nhiệt Khối lượng (Dynamic Volume Profile)
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <span class="text-sm text-gray-400 block mb-1">Mức giá POC (Trọng tâm):</span>
+                        <span id="resPoc" class="text-2xl font-bold quant-font text-yellow-500">-</span>
+                    </div>
+                    <div>
+                        <span class="text-sm text-gray-400 block mb-1">Vùng bao phủ khối lượng (VA):</span>
+                        <div class="flex items-end gap-2">
+                            <span id="resVaPercent" class="text-3xl font-bold quant-font text-purple-400">-</span>
+                            <span class="text-sm text-gray-400 mb-1">tổng thanh khoản</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col justify-center">
+                        <span class="text-sm text-gray-400 block mb-1">Vị thế so với POC:</span>
+                        <span id="resPocStatus" class="text-lg font-bold quant-font px-3 py-1 rounded w-fit">-</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="card p-6 rounded-xl flex flex-col items-center justify-center text-center">
                 <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">RVOL (Vol B / Vol A)</h4>
                 <div id="resRvol" class="text-4xl font-bold quant-font mt-2">-</div>
@@ -120,6 +139,14 @@
                 <div id="resVolAccel" class="text-4xl font-bold quant-font mt-2">-</div>
             </div>
 
+            <div class="card p-6 rounded-xl flex flex-col items-center justify-center text-center">
+                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Biến Động (VW-ATR)</h4>
+                <div class="flex items-end gap-2 mt-2">
+                    <div id="resVwAtr" class="text-3xl font-bold quant-font text-blue-300">-</div>
+                    <div id="resVwAtrPct" class="text-lg font-semibold quant-font text-gray-500 mb-1">-</div>
+                </div>
+            </div>
+            
             <div class="card p-6 rounded-xl flex flex-col justify-center">
                 <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 text-center">VWAP Độc Lập</h4>
                 <div class="flex justify-between items-center mb-2">
@@ -155,14 +182,6 @@
                     <span id="resDeltaAll" class="text-lg font-bold quant-font">-</span>
                 </div>
             </div>
-
-            <div class="card p-6 rounded-xl flex flex-col items-center justify-center text-center">
-                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Biến Động (VW-ATR)</h4>
-                <div class="flex items-end gap-2 mt-2">
-                    <div id="resVwAtr" class="text-3xl font-bold quant-font text-blue-300">-</div>
-                    <div id="resVwAtrPct" class="text-lg font-semibold quant-font text-gray-500 mb-1">-</div>
-                </div>
-            </div>
         </div>
 
         <div id="aiSection" class="mt-8 hidden">
@@ -172,32 +191,24 @@
                         <span class="text-2xl">🤖</span>
                         <div>
                             <h3 class="text-lg font-bold text-purple-400">Trạm Xuất Prompt AI</h3>
-                            <p class="text-xs text-gray-400 mt-1">Copy đoạn văn bản dưới đây và dán vào ChatGPT, Claude, hoặc Gemini để nhận phân tích.</p>
                         </div>
                     </div>
                     <button id="copyBtn" onclick="copyPromptToClipboard()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-6 rounded-md transition-colors shadow-lg shadow-purple-500/20 flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
                         <span>Copy Prompt</span>
                     </button>
                 </div>
-                
-                <textarea id="aiPromptOutput" readonly class="w-full h-64 p-4 rounded-lg quant-font text-sm text-gray-300 resize-none leading-relaxed" spellcheck="false"></textarea>
+                <textarea id="aiPromptOutput" readonly class="w-full h-80 p-4 rounded-lg quant-font text-sm text-gray-300 resize-none leading-relaxed" spellcheck="false"></textarea>
             </div>
         </div>
     </div>
 
     <script>
         const exchange = new ccxt.binance({ enableRateLimit: true });
-
-        // Biến lưu giá cũ để so sánh màu (Xanh/Đỏ)
         let previousPrice = null;
 
         function formatNumber(num, isFixedRatio = false) {
             if (num === 0) return "0";
             if (isFixedRatio) return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
             const absNum = Math.abs(num);
             let decimals = 2;
             if (absNum < 0.000001) decimals = 10;
@@ -205,33 +216,23 @@
             else if (absNum < 0.01) decimals = 6;
             else if (absNum < 1) decimals = 4;
             else decimals = 2;
-
             return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: decimals });
         }
 
         async function fetchBinanceDataByLimit(symbol, timeframe, limit) {
             const formattedSymbol = symbol.replace('/', '').toUpperCase();
             try {
-                // Tăng giới hạn nếu cần lấy hơn 1000 nến (Binance hỗ trợ API lấy max 1000 nến/lần, 
-                // nếu cần nhiều hơn phải gọi nhiều lần, nhưng ở đây ta dùng CCXT mặc định xử lý)
                 const response = await exchange.fetchOHLCV(formattedSymbol, timeframe, undefined, limit);
-                
-                // Mẹo Quant: Lấy lại Buy Volume qua implicit call nếu CCXT ko trả về
                 const rawResponse = await exchange.publicGetKlines({
-                    symbol: formattedSymbol.replace('/', ''),
-                    interval: timeframe,
-                    limit: limit
+                    symbol: formattedSymbol.replace('/', ''), interval: timeframe, limit: limit
                 });
-
                 return rawResponse.map(d => ({
                     timestamp: parseInt(d[0]), open: parseFloat(d[1]), high: parseFloat(d[2]),
                     low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5]),
                     buyVolume: parseFloat(d[9]), sellVolume: parseFloat(d[5]) - parseFloat(d[9])
                 }));
             } catch (e) {
-                console.error(e);
-                alert("Lỗi tải dữ liệu Binance. Cặp coin có thể sai hoặc mạng có vấn đề."); 
-                return [];
+                alert("Lỗi tải dữ liệu Binance."); return [];
             }
         }
 
@@ -242,6 +243,74 @@
                 cumVol += d.volume; cumVolPrice += typicalPrice * d.volume;
             });
             return cumVol === 0 ? 0 : cumVolPrice / cumVol;
+        }
+
+        // --- THUẬT TOÁN DYNAMIC VOLUME PROFILE ---
+        function calculateDynamicVolumeProfile(data, currentPrice, numBins = 100) {
+            if (data.length === 0) return { pocPrice: 0, vaPercent: 0, isAbovePoc: true };
+
+            // 1. Tìm Max/Min để chia lưới
+            let minPrice = Math.min(...data.map(d => d.low));
+            let maxPrice = Math.max(...data.map(d => d.high));
+            
+            // Fix edge case nếu nến đi ngang hoàn toàn
+            if (maxPrice === minPrice) return { pocPrice: minPrice, vaPercent: 100, isAbovePoc: currentPrice >= minPrice };
+
+            let binSize = (maxPrice - minPrice) / numBins;
+            let bins = Array(numBins).fill(0);
+            let totalVol = 0;
+
+            // 2. Nhồi Volume vào các mức giá (Bins)
+            data.forEach(d => {
+                let typPrice = (d.high + d.low + d.close) / 3;
+                let binIndex = Math.floor((typPrice - minPrice) / binSize);
+                if (binIndex >= numBins) binIndex = numBins - 1;
+                if (binIndex < 0) binIndex = 0;
+                bins[binIndex] += d.volume;
+                totalVol += d.volume;
+            });
+
+            if (totalVol === 0) return { pocPrice: currentPrice, vaPercent: 0, isAbovePoc: true };
+
+            // 3. Tìm POC (Bin có Volume to nhất)
+            let maxVol = -1; let pocIndex = -1;
+            for (let i = 0; i < numBins; i++) {
+                if (bins[i] > maxVol) { maxVol = bins[i]; pocIndex = i; }
+            }
+            let pocPrice = minPrice + (pocIndex + 0.5) * binSize;
+
+            // 4. Tìm Bin chứa Giá hiện tại
+            let targetIndex = Math.floor((currentPrice - minPrice) / binSize);
+            if (targetIndex >= numBins) targetIndex = numBins - 1;
+            if (targetIndex < 0) targetIndex = 0;
+
+            // 5. Expand (Mở rộng vùng) từ POC cho đến khi đụng Price
+            let currentVol = bins[pocIndex];
+            let upIndex = pocIndex + 1;
+            let downIndex = pocIndex - 1;
+            let reached = (pocIndex === targetIndex);
+
+            while (!reached && (upIndex < numBins || downIndex >= 0)) {
+                let volUp = upIndex < numBins ? bins[upIndex] : -1;
+                let volDown = downIndex >= 0 ? bins[downIndex] : -1;
+
+                if (volUp >= volDown) {
+                    currentVol += volUp;
+                    if (upIndex === targetIndex) reached = true;
+                    upIndex++;
+                } else {
+                    currentVol += volDown;
+                    if (downIndex === targetIndex) reached = true;
+                    downIndex--;
+                }
+            }
+
+            let vaPercent = (currentVol / totalVol) * 100;
+            return {
+                pocPrice: pocPrice,
+                vaPercent: vaPercent,
+                isAbovePoc: currentPrice >= pocPrice
+            };
         }
 
         function updateMainRatio(id, value, prefix = "") {
@@ -260,25 +329,15 @@
         function updateCurrentPriceDisplay(price) {
             const container = document.getElementById('currentPriceContainer');
             const display = document.getElementById('currentPriceDisplay');
-            
             container.classList.remove('hidden');
-            
-            // Xóa hiệu ứng cũ để chạy lại hiệu ứng nhấp nháy
             container.classList.remove('price-flash');
-            void container.offsetWidth; // Trigger reflow
+            void container.offsetWidth; 
             container.classList.add('price-flash');
-
             display.innerText = formatNumber(price);
-
-            // Đổi màu dựa trên giá tăng/giảm so với lần trước
             if (previousPrice !== null) {
-                if (price > previousPrice) {
-                    display.className = "text-xl font-bold quant-font text-green-400";
-                } else if (price < previousPrice) {
-                    display.className = "text-xl font-bold quant-font text-red-400";
-                } else {
-                    display.className = "text-xl font-bold quant-font text-white";
-                }
+                if (price > previousPrice) display.className = "text-xl font-bold quant-font text-green-400";
+                else if (price < previousPrice) display.className = "text-xl font-bold quant-font text-red-400";
+                else display.className = "text-xl font-bold quant-font text-white";
             }
             previousPrice = price;
         }
@@ -291,39 +350,20 @@
             const lenA = parseInt(document.getElementById('lengthA').value);
             const lenB = parseInt(document.getElementById('lengthB').value);
             
-            if (isNaN(lenA) || isNaN(lenB) || lenA <= 0 || lenB <= 0) {
-                alert("Vui lòng nhập số nến hợp lệ."); return;
-            }
-
             const totalCandles = lenA + lenB;
-            if (totalCandles > 1000) {
-                alert(`Binance API Klines giới hạn tối đa 1000 nến cho mỗi lần tải. Bạn đang yêu cầu ${totalCandles}. Vui lòng giảm tổng số nến A+B xuống dưới 1000.`);
-                return;
-            }
-
             status.innerText = `Đang tải ${totalCandles} nến...`;
             btn.disabled = true; btn.classList.add("opacity-50");
 
-            // BƯỚC FIX 1: Tải dư 1 nến để phòng hờ nến hiện tại chưa đóng
             const rawData = await fetchBinanceDataByLimit(symbol, timeframe, totalCandles + 1);
-            
-            if (rawData.length > 0) {
-                // BƯỚC FIX 2: Vứt bỏ nến cuối cùng (nến đang chạy) khỏi mảng
-                rawData.pop(); 
-            }
-            
-            const allData = rawData; // Gán lại vào allData để tính toán
-
-            if (allData.length < totalCandles) {
-                status.innerText = `Cảnh báo: Chỉ lấy được ${allData.length} nến.`;
-            }
+            if (rawData.length > 0) rawData.pop(); 
+            const allData = rawData;
 
             const dataA = allData.slice(0, allData.length - lenB);
             const dataB = allData.slice(-lenB);
 
-            if (dataA.length === 0 || dataB.length === 0) {
-                status.innerText = "Lỗi: Không đủ dữ liệu."; btn.disabled = false; btn.classList.remove("opacity-50"); return;
-            }
+            // Giá hiện tại real-time
+            const ticker = await exchange.fetchTicker(symbol.replace('/', '').toUpperCase());
+            const currentPrice = ticker.last;
 
             // Math
             const avgVolA = dataA.reduce((sum, d) => sum + d.volume, 0) / dataA.length;
@@ -350,25 +390,35 @@
                 const d = allData[i]; totalVolCombined += d.volume;
                 weightedPriceMoveAll += (d.close - d.open) * d.volume; 
                 sumWdAll_num += ((d.buyVolume - d.sellVolume) * d.volume);
-
                 let tr = d.high - d.low; 
-                if (i > 0) {
-                    const prevClose = allData[i - 1].close;
-                    tr = Math.max(d.high - d.low, Math.abs(d.high - prevClose), Math.abs(d.low - prevClose));
-                }
+                if (i > 0) tr = Math.max(d.high - d.low, Math.abs(d.high - allData[i - 1].close), Math.abs(d.low - allData[i - 1].close));
                 cumWeightedTR += (tr * d.volume);
             }
 
             const priceDirAll = totalVolCombined === 0 ? 0 : (weightedPriceMoveAll / totalVolCombined);
             const vwDeltaAll = totalVolCombined === 0 ? 0 : (sumWdAll_num / totalVolCombined);
             const vwAtr = totalVolCombined === 0 ? 0 : (cumWeightedTR / totalVolCombined);
-            // Gọi trực tiếp giá Ticker realtime từ Binance qua CCXT thay vì lấy từ nến cũ
-            const ticker = await exchange.fetchTicker(symbol);
-            const currentPrice = ticker.last;
             const vwAtrPct = (vwAtr / currentPrice) * 100;
 
+            // Gọi hàm Dynamic Volume Profile (Dựa trên toàn bộ dữ liệu A+B)
+            const vpData = calculateDynamicVolumeProfile(allData, currentPrice, 100);
+
             // UI
-            updateCurrentPriceDisplay(currentPrice); // Hiển thị giá hiện tại
+            updateCurrentPriceDisplay(currentPrice); 
+            
+            // Cập nhật thẻ VP
+            document.getElementById('resPoc').innerText = formatNumber(vpData.pocPrice);
+            document.getElementById('resVaPercent').innerText = formatNumber(vpData.vaPercent, true) + "%";
+            
+            const pocStatusEl = document.getElementById('resPocStatus');
+            if (vpData.isAbovePoc) {
+                pocStatusEl.innerText = "Nằm TRÊN POC (Bullish)";
+                pocStatusEl.className = "text-sm font-bold quant-font px-3 py-1 rounded w-fit bg-green-500/20 text-green-400 border border-green-500/30";
+            } else {
+                pocStatusEl.innerText = "Nằm DƯỚI POC (Bearish)";
+                pocStatusEl.className = "text-sm font-bold quant-font px-3 py-1 rounded w-fit bg-red-500/20 text-red-400 border border-red-500/30";
+            }
+
             updateMainRatio('resRvol', rvol, rvol > 1 ? "🔥 " : "❄️ ");
             updateMainRatio('resVolAccel', volAccel, volAccel > 1 ? "🚀 " : "🐢 ");
             document.getElementById('resVwapA').innerText = formatNumber(vwapA, false);
@@ -379,80 +429,67 @@
             document.getElementById('resVwAtrPct').innerText = "(" + formatNumber(vwAtrPct, true) + "%)";
 
             // GENERATE PROMPT
-            generateAIPrompt(symbol, timeframe, lenA, lenB, totalCandles, currentPrice, vwapA, vwapB, rvol, volAccel, priceDirB, priceDirAll, vwDeltaB, vwDeltaAll, vwAtrPct, vwAtr);
+            generateAIPrompt(symbol, timeframe, lenA, lenB, currentPrice, vwapA, vwapB, rvol, volAccel, priceDirB, priceDirAll, vwDeltaB, vwDeltaAll, vwAtrPct, vwAtr, vpData);
 
             document.getElementById('results').classList.remove("hidden");
             document.getElementById('aiSection').classList.remove("hidden");
-            status.innerText = `Đã tính toán xong dựa trên ${allData.length} nến!`;
+            status.innerText = `Đã tính toán xong dựa trên ${allData.length} nến chuẩn!`;
             btn.disabled = false; btn.classList.remove("opacity-50");
         }
 
-        function generateAIPrompt(symbol, tf, lenA, lenB, total, price, vA, vB, rvol, accel, pDirB, pDirAll, dDirB, dDirAll, atrPct, atr) {
+        function generateAIPrompt(symbol, tf, lenA, lenB, price, vA, vB, rvol, accel, pDirB, pDirAll, dDirB, dDirAll, atrPct, atr, vpData) {
             const now = new Date();
             const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
             const dayOfWeek = days[now.getUTCDay()];
             const utcTime = now.toISOString().substring(11, 16); 
             const utcDate = now.toISOString().substring(0, 10);  
+            
+            const pocStatusText = vpData.isAbovePoc ? "Nằm TRÊN POC" : "Nằm DƯỚI POC";
 
-            const promptText = `Bạn là một chuyên gia Quant Trading xuất sắc, chuyên môn sâu về Order Flow, Volume Spread Analysis (VSA) và lý thuyết Wyckoff.
+            const promptText = `Bạn là một chuyên gia Quant Trading xuất sắc, chuyên môn sâu về Order Flow, Volume Profile và lý thuyết Wyckoff.
 
 Dưới đây là dữ liệu vi mô (Micro-structure) của cặp ${symbol} trên khung thời gian ${tf}. 
 Thị trường được chia làm 2 cửa sổ: 
-- Cửa sổ A (Dài hạn): ${lenA} nến trước đó.
-- Cửa sổ B (Ngắn hạn hiện tại): ${lenB} nến gần nhất.
+- Cửa sổ A (Dài hạn): ${lenA} nến.
+- Cửa sổ B (Ngắn hạn): ${lenB} nến.
 
 [BỐI CẢNH THỜI GIAN]
-* Thời gian hiện tại (Chuẩn UTC): ${dayOfWeek}, ngày ${utcDate} lúc ${utcTime} (Hãy cân nhắc yếu tố phiên giao dịch hoặc cuối tuần nếu có).
+* Chuẩn UTC: ${dayOfWeek}, ngày ${utcDate} lúc ${utcTime}.
 
-[DỮ LIỆU ĐỊNH LƯỢNG]
+[DỮ LIỆU ĐỊNH LƯỢNG MỚI NHẤT]
 * Giá hiện tại: ${formatNumber(price)}
+* Biên độ giao động ATR: ${formatNumber(atr)} (${formatNumber(atrPct)}%) 
+* Trọng tâm khối lượng (POC): ${formatNumber(vpData.pocPrice)}
+* Vị thế Volume Profile: Giá hiện tại đang bao phủ ${formatNumber(vpData.vaPercent, true)}% tổng khối lượng giao dịch và ${pocStatusText}.
 * VWAP (A): ${formatNumber(vA)} | VWAP (B): ${formatNumber(vB)}
 * RVOL (Vol trung bình B so với A): ${formatNumber(rvol, true)}
 * Gia tốc Volume (B so với cuối A): ${formatNumber(accel, true)}
-* Hướng Giá (VW-Price) riêng B: ${formatNumber(pDirB)} | Tổng (A+B): ${formatNumber(pDirAll)}
-* Hướng Delta (VW-Delta) riêng B: ${formatNumber(dDirB)} | Tổng (A+B): ${formatNumber(dDirAll)}
-* Mức độ biến động VW-ATR: ${formatNumber(atr, true)} (${formatNumber(atrPct, true)}%)
+* Hướng Giá (VW-Price) tổng (A+B): ${formatNumber(pDirAll)} | Cửa sổ B: ${formatNumber(pDirB)}
+* Hướng Delta (VW-Delta) tổng (A+B): ${formatNumber(dDirAll)} | Cửa sổ B: ${formatNumber(dDirB)}
 
 [YÊU CẦU PHÂN TÍCH]
-1. Không lặp lại các con số một cách máy móc. Hãy dịch chúng thành hành vi dòng tiền (Smart Money đang gom hàng, xả hàng, hay rũ bỏ?).
-2. Đánh giá sự hợp lý của Volume dựa trên bối cảnh Thời gian (Giờ UTC, ngày trong tuần).
-3. Dựa vào RVOL và Gia tốc Volume, hãy đánh giá độ uy tín của Hướng Delta hiện tại.
-4. Sử dụng góc nhìn Wyckoff (Đang ở pha Tích lũy, Phân phối, hay Markup/Markdown?)
-5. Trả lời sắc bén, chia làm 3 phần:
-   - BỨC TRANH DÒNG TIỀN (Tổng quan)
-   - HÀNH VI VI MÔ (Nhận định cửa sổ B)
-   - KHUYẾN NGHỊ HÀNH ĐỘNG (Kịch bản rủi ro).`;
+1. Hãy phân tích độ "đậm đặc" của thanh khoản dựa trên việc giá đang nằm ở vùng ${formatNumber(vpData.vaPercent, true)}% khối lượng. (Nó đang ở giữa vùng tranh chấp hay đã thoát ra rìa phân phối?)
+2. Sự mâu thuẫn hoặc đồng thuận giữa vị thế POC và VWAP đang kể câu chuyện gì?
+3. Dựa vào RVOL và Gia tốc Volume hiện tại, phe nào đang làm chủ nhịp điệu ngắn hạn?
+4. Đưa ra kịch bản hành động ngắn gọn dựa trên cấu trúc trên.`;
 
             document.getElementById('aiPromptOutput').value = promptText;
             
             const copyBtn = document.getElementById('copyBtn');
-            copyBtn.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                <span>Copy Prompt</span>
-            `;
+            copyBtn.innerHTML = `<span>Copy Prompt</span>`;
             copyBtn.classList.replace('bg-green-600', 'bg-purple-600');
             copyBtn.classList.replace('hover:bg-green-500', 'hover:bg-purple-500');
-            copyBtn.classList.replace('shadow-green-500/20', 'shadow-purple-500/20');
         }
 
         function copyPromptToClipboard() {
             const textarea = document.getElementById('aiPromptOutput');
             textarea.select();
             textarea.setSelectionRange(0, 99999); 
-            
             navigator.clipboard.writeText(textarea.value).then(() => {
                 const copyBtn = document.getElementById('copyBtn');
-                copyBtn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span>Đã Copy!</span>
-                `;
+                copyBtn.innerHTML = `<span>Đã Copy!</span>`;
                 copyBtn.classList.replace('bg-purple-600', 'bg-green-600');
                 copyBtn.classList.replace('hover:bg-purple-500', 'hover:bg-green-500');
-                copyBtn.classList.replace('shadow-purple-500/20', 'shadow-green-500/20');
             });
         }
     </script>
