@@ -369,7 +369,7 @@
             document.getElementById('resVwAtrPct').innerText = "(" + formatNumber(vwAtrPct, true) + "%)";
 
             // GENERATE PROMPT
-            generateAIPrompt(symbol, timeframe, lenA, lenB, totalCandles, currentPrice, vwapA, vwapB, rvol, volAccel, priceDirB, priceDirAll, vwDeltaB, vwDeltaAll, vwAtrPct);
+            generateAIPrompt(symbol, timeframe, lenA, lenB, totalCandles, currentPrice, vwapA, vwapB, rvol, volAccel, priceDirB, priceDirAll, vwDeltaB, vwDeltaAll, vwAtrPct, vwAtr);
 
             document.getElementById('results').classList.remove("hidden");
             document.getElementById('aiSection').classList.remove("hidden");
@@ -377,7 +377,7 @@
             btn.disabled = false; btn.classList.remove("opacity-50");
         }
 
-        function generateAIPrompt(symbol, tf, lenA, lenB, total, price, vA, vB, rvol, accel, pDirB, pDirAll, dDirB, dDirAll, atrPct) {
+        function generateAIPrompt(symbol, tf, lenA, lenB, total, price, vA, vB, rvol, accel, pDirB, pDirAll, dDirB, dDirAll, atrPct, atr) {
             const now = new Date();
             const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
             const dayOfWeek = days[now.getUTCDay()];
@@ -401,7 +401,7 @@ Thị trường được chia làm 2 cửa sổ:
 * Gia tốc Volume (B so với cuối A): ${formatNumber(accel, true)}
 * Hướng Giá (VW-Price) riêng B: ${formatNumber(pDirB)} | Tổng (A+B): ${formatNumber(pDirAll)}
 * Hướng Delta (VW-Delta) riêng B: ${formatNumber(dDirB)} | Tổng (A+B): ${formatNumber(dDirAll)}
-* Mức độ biến động VW-ATR: ${formatNumber(atrPct, true)}%
+* Mức độ biến động VW-ATR: ${formatNumber(atr, true)} (${formatNumber(atrPct, true)}%)
 
 [YÊU CẦU PHÂN TÍCH]
 1. Không lặp lại các con số một cách máy móc. Hãy dịch chúng thành hành vi dòng tiền (Smart Money đang gom hàng, xả hàng, hay rũ bỏ?).
