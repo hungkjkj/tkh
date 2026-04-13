@@ -304,8 +304,16 @@
             status.innerText = `Đang tải ${totalCandles} nến...`;
             btn.disabled = true; btn.classList.add("opacity-50");
 
-            const allData = await fetchBinanceDataByLimit(symbol, timeframe, totalCandles);
+            // BƯỚC FIX 1: Tải dư 1 nến để phòng hờ nến hiện tại chưa đóng
+            const rawData = await fetchBinanceDataByLimit(symbol, timeframe, totalCandles + 1);
             
+            if (rawData.length > 0) {
+                // BƯỚC FIX 2: Vứt bỏ nến cuối cùng (nến đang chạy) khỏi mảng
+                rawData.pop(); 
+            }
+            
+            const allData = rawData; // Gán lại vào allData để tính toán
+
             if (allData.length < totalCandles) {
                 status.innerText = `Cảnh báo: Chỉ lấy được ${allData.length} nến.`;
             }
@@ -354,7 +362,9 @@
             const priceDirAll = totalVolCombined === 0 ? 0 : (weightedPriceMoveAll / totalVolCombined);
             const vwDeltaAll = totalVolCombined === 0 ? 0 : (sumWdAll_num / totalVolCombined);
             const vwAtr = totalVolCombined === 0 ? 0 : (cumWeightedTR / totalVolCombined);
-            const currentPrice = allData[allData.length - 1].close;
+            // Gọi trực tiếp giá Ticker realtime từ Binance qua CCXT thay vì lấy từ nến cũ
+            const ticker = await exchange.fetchTicker(symbol);
+            const currentPrice = ticker.last;
             const vwAtrPct = (vwAtr / currentPrice) * 100;
 
             // UI
