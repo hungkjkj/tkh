@@ -62,12 +62,13 @@
                 <div>
                     <label class="block text-xs font-semibold text-gray-400 uppercase mb-2">Khung Thời Gian</label>
                     <select id="timeframe" class="w-full px-3 py-2 rounded-md quant-font font-bold text-lg text-center">
-                        <option value="1m">1m</option>
+                        <option value="1m" selected>1m</option>
                         <option value="5m">5m</option>
-                        <option value="15m" selected>15m</option>
+                        <option value="15m">15m</option>
                         <option value="1h">1h</option>
                         <option value="4h">4h</option>
                         <option value="1d">1d</option>
+                        <option value="1w">1w</option>
                     </select>
                 </div>
                 
@@ -75,7 +76,7 @@
                     <label class="block text-xs font-semibold text-blue-400 uppercase mb-2">Cửa sổ A (Dài hạn)</label>
                     <div class="flex items-center justify-between">
                         <span class="text-sm text-gray-400">Số nến:</span>
-                        <input type="number" id="lengthA" value="720" min="1" max="2000" class="w-24 px-2 py-1 rounded quant-font font-bold text-center">
+                        <input type="number" id="lengthA" value="10080" min="1" max="10000" class="w-24 px-2 py-1 rounded quant-font font-bold text-center">
                     </div>
                 </div>
 
@@ -83,7 +84,7 @@
                     <label class="block text-xs font-semibold text-yellow-400 uppercase mb-2">Cửa sổ B (Ngắn hạn)</label>
                     <div class="flex items-center justify-between">
                         <span class="text-sm text-gray-400">Số nến:</span>
-                        <input type="number" id="lengthB" value="26" min="1" max="1000" class="w-24 px-2 py-1 rounded quant-font font-bold text-center">
+                        <input type="number" id="lengthB" value="390" min="1" max="1000" class="w-24 px-2 py-1 rounded quant-font font-bold text-center">
                     </div>
                     <div class="text-xs text-gray-500 mt-2 italic text-right">* Dakj sẽ tự động = 4 x B</div>
                 </div>
@@ -155,25 +156,25 @@
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm text-yellow-400">Ngắn hạn (B):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resSmaB" class="text-lg font-bold quant-font text-gray-400">-</span>
+                        <span id="resSmaB" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
-                        <span id="resVwapB" class="text-lg font-bold quant-font text-yellow-400">-</span>
+                        <span id="resVwapB" class="text-lg font-bold quant-font">-</span>
                     </div>
                 </div>
                 <div class="flex justify-between items-center mb-2 bg-gray-800/50 p-1 rounded">
                     <span class="text-sm text-orange-300">Trung hạn (Dakj):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resSmaDakj" class="text-lg font-bold quant-font text-gray-400">-</span>
+                        <span id="resSmaDakj" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
-                        <span id="resVwapDakj" class="text-lg font-bold quant-font text-orange-300">-</span>
+                        <span id="resVwapDakj" class="text-lg font-bold quant-font">-</span>
                     </div>
                 </div>
                 <div class="flex justify-between items-center">
                     <span class="text-sm text-blue-400">Dài hạn (A):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resSmaA" class="text-lg font-bold quant-font text-gray-400">-</span>
+                        <span id="resSmaA" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
-                        <span id="resVwapA" class="text-lg font-bold quant-font text-blue-400">-</span>
+                        <span id="resVwapA" class="text-lg font-bold quant-font">-</span>
                     </div>
                 </div>
             </div>
@@ -260,20 +261,54 @@
             return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: decimals });
         }
 
+        // Cào dữ liệu theo chuẩn Backwards Pagination (Vượt qua giới hạn 1000 nến)
         async function fetchBinanceDataByLimit(symbol, timeframe, limit) {
             const formattedSymbol = symbol.replace('/', '').toUpperCase();
+            const apiSymbol = formattedSymbol.replace('/', '');
+            let allData = [];
+            let remaining = limit;
+            let currentEndTime = undefined;
+
             try {
-                const response = await exchange.fetchOHLCV(formattedSymbol, timeframe, undefined, limit);
-                const rawResponse = await exchange.publicGetKlines({
-                    symbol: formattedSymbol.replace('/', ''), interval: timeframe, limit: limit
-                });
-                return rawResponse.map(d => ({
-                    timestamp: parseInt(d[0]), open: parseFloat(d[1]), high: parseFloat(d[2]),
-                    low: parseFloat(d[3]), close: parseFloat(d[4]), volume: parseFloat(d[5]),
-                    buyVolume: parseFloat(d[9]), sellVolume: parseFloat(d[5]) - parseFloat(d[9])
+                while (remaining > 0) {
+                    const fetchCount = Math.min(remaining, 1000);
+                    const params = {
+                        symbol: apiSymbol,
+                        interval: timeframe,
+                        limit: fetchCount
+                    };
+                    
+                    if (currentEndTime) {
+                        params.endTime = currentEndTime;
+                    }
+
+                    const response = await exchange.publicGetKlines(params);
+                    
+                    if (!response || response.length === 0) break;
+
+                    allData = response.concat(allData);
+                    remaining -= response.length;
+                    currentEndTime = parseInt(response[0][0]) - 1;
+
+                    if (remaining > 0) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                }
+
+                return allData.slice(-limit).map(d => ({
+                    timestamp: parseInt(d[0]), 
+                    open: parseFloat(d[1]), 
+                    high: parseFloat(d[2]),
+                    low: parseFloat(d[3]), 
+                    close: parseFloat(d[4]), 
+                    volume: parseFloat(d[5]),
+                    buyVolume: parseFloat(d[9]), 
+                    sellVolume: parseFloat(d[5]) - parseFloat(d[9])
                 }));
             } catch (e) {
-                alert("Lỗi tải dữ liệu Binance."); return [];
+                console.error("Fetch Error:", e);
+                alert("Lỗi tải dữ liệu. Có thể do đứt kết nối hoặc quá giới hạn API."); 
+                return [];
             }
         }
 
@@ -355,6 +390,26 @@
             const prefix = value > 0 ? "+" : "";
             el.innerText = prefix + formatNumber(value, false);
             el.className = "text-lg font-bold quant-font " + (value > 0 ? "text-green-500" : (value < 0 ? "text-red-500" : "text-gray-400"));
+        }
+        
+        // Hàm set màu so sánh Xanh/Đỏ cho cặp SMA và VWAP
+        function setCompareColor(id1, val1, id2, val2) {
+            const el1 = document.getElementById(id1);
+            const el2 = document.getElementById(id2);
+            el1.innerText = formatNumber(val1, false);
+            el2.innerText = formatNumber(val2, false);
+
+            const baseClass = "text-lg font-bold quant-font ";
+            if (val1 > val2) {
+                el1.className = baseClass + "text-green-500";
+                el2.className = baseClass + "text-red-500";
+            } else if (val2 > val1) {
+                el1.className = baseClass + "text-red-500";
+                el2.className = baseClass + "text-green-500";
+            } else {
+                el1.className = baseClass + "text-gray-400";
+                el2.className = baseClass + "text-gray-400";
+            }
         }
 
         function updateCurrentPriceDisplay(price) {
@@ -481,15 +536,10 @@
             updateMainRatio('resRvol', rvol, rvol > 1 ? "🔥 " : "❄️ ");
             updateMainRatio('resVolAccel', volAccel, volAccel > 1 ? "🚀 " : "🐢 ");
             
-            // SMA & VWAP
-            document.getElementById('resSmaA').innerText = formatNumber(smaA, false);
-            document.getElementById('resVwapA').innerText = formatNumber(vwapA, false);
-            
-            document.getElementById('resSmaB').innerText = formatNumber(smaB, false);
-            document.getElementById('resVwapB').innerText = formatNumber(vwapB, false);
-            
-            document.getElementById('resSmaDakj').innerText = formatNumber(smaDakj, false);
-            document.getElementById('resVwapDakj').innerText = formatNumber(vwapDakj, false);
+            // Cập nhật màu sắc so sánh cho SMA & VWAP
+            setCompareColor('resSmaA', smaA, 'resVwapA', vwapA);
+            setCompareColor('resSmaB', smaB, 'resVwapB', vwapB);
+            setCompareColor('resSmaDakj', smaDakj, 'resVwapDakj', vwapDakj);
             
             // Price Dir
             setSubMetric('resPriceDirB', priceDirB); 
