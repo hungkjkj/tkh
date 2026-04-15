@@ -148,19 +148,33 @@
                 </div>
             </div>
             
-            <div class="card p-6 rounded-xl flex flex-col justify-center border-t-2 border-gray-600">
-                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 text-center">VWAP Hệ Thống</h4>
+            <div class="card p-6 rounded-xl flex flex-col justify-center border-t-2 border-gray-600 relative">
+                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 text-center">Đường Trung Bình</h4>
+                <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-4 text-right">SMA <span class="text-gray-600 px-1">|</span> VWAP</div>
+                
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm text-yellow-400">Ngắn hạn (B):</span>
-                    <span id="resVwapB" class="text-lg font-bold quant-font text-yellow-400">-</span>
+                    <div class="flex items-center gap-2">
+                        <span id="resSmaB" class="text-lg font-bold quant-font text-gray-400">-</span>
+                        <span class="text-gray-600 text-sm">|</span>
+                        <span id="resVwapB" class="text-lg font-bold quant-font text-yellow-400">-</span>
+                    </div>
                 </div>
                 <div class="flex justify-between items-center mb-2 bg-gray-800/50 p-1 rounded">
                     <span class="text-sm text-orange-300">Trung hạn (Dakj):</span>
-                    <span id="resVwapDakj" class="text-lg font-bold quant-font text-orange-300">-</span>
+                    <div class="flex items-center gap-2">
+                        <span id="resSmaDakj" class="text-lg font-bold quant-font text-gray-400">-</span>
+                        <span class="text-gray-600 text-sm">|</span>
+                        <span id="resVwapDakj" class="text-lg font-bold quant-font text-orange-300">-</span>
+                    </div>
                 </div>
                 <div class="flex justify-between items-center">
                     <span class="text-sm text-blue-400">Dài hạn (A):</span>
-                    <span id="resVwapA" class="text-lg font-bold quant-font text-blue-400">-</span>
+                    <div class="flex items-center gap-2">
+                        <span id="resSmaA" class="text-lg font-bold quant-font text-gray-400">-</span>
+                        <span class="text-gray-600 text-sm">|</span>
+                        <span id="resVwapA" class="text-lg font-bold quant-font text-blue-400">-</span>
+                    </div>
                 </div>
             </div>
 
@@ -367,7 +381,6 @@
             const lenA = parseInt(document.getElementById('lengthA').value);
             const lenB = parseInt(document.getElementById('lengthB').value);
             
-            // Logic tính độ dài Dakj
             const lenDakj = lenB * 4;
             const totalCandles = Math.max(lenA + lenB, lenDakj); 
 
@@ -378,7 +391,6 @@
             if (rawData.length > 0) rawData.pop(); 
             const allData = rawData;
 
-            // Phân bổ dữ liệu
             const dataA = allData.slice(0, allData.length - lenB);
             const dataB = allData.slice(-lenB);
             const actualLenDakj = Math.min(lenDakj, allData.length);
@@ -396,10 +408,14 @@
             const sumVolLastNofA = dataA.slice(-dataB.length).reduce((sum, d) => sum + d.volume, 0);
             const volAccel = sumVolLastNofA === 0 ? 0 : sumVolB / sumVolLastNofA;
 
+            // VWAP & SMA A
             const vwapA = calculateVWAP(dataA); 
+            const smaA = dataA.length > 0 ? dataA.reduce((sum, d) => sum + d.close, 0) / dataA.length : 0;
+            
+            // VWAP & SMA B
             const vwapB = calculateVWAP(dataB);
+            const smaB = dataB.length > 0 ? dataB.reduce((sum, d) => sum + d.close, 0) / dataB.length : 0;
 
-            // Simple Price Direction (B)
             const simplePriceDirB = dataB.length > 0 ? dataB.reduce((sum, d) => sum + (d.close - d.open), 0) / dataB.length : 0;
             
             let sumWdB_num = 0, sumWdB_den = 0, weightedPriceMoveB = 0;
@@ -413,8 +429,8 @@
 
             // --- TÍNH TOÁN CỬA SỔ DAKJ ---
             const vwapDakj = calculateVWAP(dataDakj);
+            const smaDakj = dataDakj.length > 0 ? dataDakj.reduce((sum, d) => sum + d.close, 0) / dataDakj.length : 0;
             
-            // Simple Price Direction (Dakj)
             const simplePriceDirDakj = dataDakj.length > 0 ? dataDakj.reduce((sum, d) => sum + (d.close - d.open), 0) / dataDakj.length : 0;
 
             let sumWdDakj_num = 0, sumWdDakj_den = 0, weightedPriceMoveDakj = 0;
@@ -428,7 +444,6 @@
             const priceDirDakj = sumWdDakj_den === 0 ? 0 : (weightedPriceMoveDakj / sumWdDakj_den);
 
             // --- TÍNH TOÁN TỔNG (ALL) ---
-            // Simple Price Direction (All)
             const simplePriceDirAll = allData.length > 0 ? allData.reduce((sum, d) => sum + (d.close - d.open), 0) / allData.length : 0;
 
             let totalVolCombined = 0, weightedPriceMoveAll = 0, sumWdAll_num = 0, cumWeightedTR = 0;
@@ -466,17 +481,21 @@
             updateMainRatio('resRvol', rvol, rvol > 1 ? "🔥 " : "❄️ ");
             updateMainRatio('resVolAccel', volAccel, volAccel > 1 ? "🚀 " : "🐢 ");
             
-            // VWAP
+            // SMA & VWAP
+            document.getElementById('resSmaA').innerText = formatNumber(smaA, false);
             document.getElementById('resVwapA').innerText = formatNumber(vwapA, false);
+            
+            document.getElementById('resSmaB').innerText = formatNumber(smaB, false);
             document.getElementById('resVwapB').innerText = formatNumber(vwapB, false);
+            
+            document.getElementById('resSmaDakj').innerText = formatNumber(smaDakj, false);
             document.getElementById('resVwapDakj').innerText = formatNumber(vwapDakj, false);
             
-            // Price Dir (VW-Price)
+            // Price Dir
             setSubMetric('resPriceDirB', priceDirB); 
             setSubMetric('resPriceDirDakj', priceDirDakj);
             setSubMetric('resPriceDirAll', priceDirAll);
 
-            // Price Dir (Simple)
             setSubMetric('resSimplePriceB', simplePriceDirB); 
             setSubMetric('resSimplePriceDakj', simplePriceDirDakj);
             setSubMetric('resSimplePriceAll', simplePriceDirAll);
@@ -490,7 +509,7 @@
             document.getElementById('resVwAtrPct').innerText = "(" + formatNumber(vwAtrPct, true) + "%)";
 
             // GENERATE PROMPT
-            generateAIPrompt(symbol, tf, lenA, lenB, lenDakj, currentPrice, vwapA, vwapB, vwapDakj, rvol, volAccel, priceDirB, priceDirDakj, priceDirAll, simplePriceDirB, simplePriceDirDakj, simplePriceDirAll, vwDeltaB, vwDeltaDakj, vwDeltaAll, vwAtrPct, vwAtr, vpData);
+            generateAIPrompt(symbol, timeframe, lenA, lenB, lenDakj, currentPrice, vwapA, vwapB, vwapDakj, smaA, smaB, smaDakj, rvol, volAccel, priceDirB, priceDirDakj, priceDirAll, simplePriceDirB, simplePriceDirDakj, simplePriceDirAll, vwDeltaB, vwDeltaDakj, vwDeltaAll, vwAtrPct, vwAtr, vpData);
 
             document.getElementById('results').classList.remove("hidden");
             document.getElementById('aiSection').classList.remove("hidden");
@@ -498,7 +517,7 @@
             btn.disabled = false; btn.classList.remove("opacity-50");
         }
 
-        function generateAIPrompt(symbol, tf, lenA, lenB, lenDakj, price, vA, vB, vDakj, rvol, accel, pDirB, pDirDakj, pDirAll, simplePB, simplePDakj, simplePAll, dDirB, dDirDakj, dDirAll, atrPct, atr, vpData) {
+        function generateAIPrompt(symbol, tf, lenA, lenB, lenDakj, price, vA, vB, vDakj, sA, sB, sDakj, rvol, accel, pDirB, pDirDakj, pDirAll, simplePB, simplePDakj, simplePAll, dDirB, dDirDakj, dDirAll, atrPct, atr, vpData) {
             const now = new Date();
             const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
             const dayOfWeek = days[now.getDay()];
@@ -522,8 +541,10 @@ Thị trường được chia làm 3 cửa sổ:
 * Giá hiện tại: ${formatNumber(price)}
 * Biên độ giao động ATR: ${formatNumber(atr)} (${formatNumber(atrPct)}%) 
 * Trọng tâm khối lượng (POC): ${formatNumber(vpData.pocPrice)}
-* Vị thế Volume Profile: Giá hiện tại đang bao phủ ${formatNumber(vpData.vaPercent, true)}% tổng khối lượng giao dịch và ${pocStatusText}.
-* VWAP (A): ${formatNumber(vA)} | VWAP (Dakj): ${formatNumber(vDakj)} | VWAP (B): ${formatNumber(vB)}
+* Vị thế Volume Profile: Giá bao phủ ${formatNumber(vpData.vaPercent, true)}% khối lượng và ${pocStatusText}.
+* Trung bình (SMA | VWAP) cửa sổ A: ${formatNumber(sA)} | ${formatNumber(vA)}
+* Trung bình (SMA | VWAP) cửa sổ Dakj: ${formatNumber(sDakj)} | ${formatNumber(vDakj)}
+* Trung bình (SMA | VWAP) cửa sổ B: ${formatNumber(sB)} | ${formatNumber(vB)}
 * RVOL (Vol trung bình B so với A): ${formatNumber(rvol, true)}
 * Gia tốc Volume (B so với cuối A): ${formatNumber(accel, true)}
 * Hướng Giá (Đơn thuần | VW-Price) tổng (A+B): ${formatNumber(simplePAll)} | ${formatNumber(pDirAll)}
@@ -532,9 +553,9 @@ Thị trường được chia làm 3 cửa sổ:
 * Hướng Delta (VW-Delta) tổng (A+B): ${formatNumber(dDirAll)} | Cửa sổ Dakj: ${formatNumber(dDirDakj)} | Cửa sổ B: ${formatNumber(dDirB)}
 
 [YÊU CẦU PHÂN TÍCH]
-1. Phân tích sự Mâu thuẫn/Phân kỳ giữa Hướng Giá Đơn Thuần và VW-Price ở các cửa sổ. Liệu giá đang tăng thực sự hay chỉ là một nhịp tăng "rỗng" (Fake-out / Exhaustion)?
-2. Sự đồng thuận giữa vị thế POC và cấu trúc 3 đường VWAP (A, Dakj, B) đang kể câu chuyện gì?
-3. Dựa vào sự chuyển giao dòng tiền từ Dakj sang B thông qua chỉ số Hướng Delta, phe nào đang nắm quyền kiểm soát?
+1. Phân tích sự Phân kỳ giữa SMA và VWAP: Dòng tiền (VWAP) đang nằm trên hay dưới Thời gian (SMA)? Điều này chứng tỏ Cá mập đang gom hàng hay đang xả?
+2. Phân tích sự Phân kỳ giữa Hướng Giá Đơn Thuần và VW-Price. Nhịp tăng/giảm này có "rỗng ruột" không?
+3. Sự đồng thuận giữa vị thế POC và 3 đường VWAP đang kể câu chuyện gì?
 4. Đưa ra kịch bản hành động ngắn gọn dựa trên cấu trúc trên.`;
 
             document.getElementById('aiPromptOutput').value = promptText;
