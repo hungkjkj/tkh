@@ -275,6 +275,7 @@
     <script>
         const exchange = new ccxt.binance({ enableRateLimit: true });
         let previousPrice = null;
+        let autoUpdateTimer = null;
 
         function formatNumber(num, isFixedRatio = false) {
             if (num === 0) return "0";
@@ -678,7 +679,12 @@
             generateAIPrompt(symbol, timeframe, lenA, lenB, lenDakj, currentPrice, vwapA, vwapB, vwapDakj, smaA, smaB, smaDakj, rvolA, rvolDakj, volAccel, priceDirB, priceDirDakj, priceDirAll, simplePriceDirB, simplePriceDirDakj, simplePriceDirAll, vwDeltaB, vwDeltaDakj, vwDeltaAll, vwAtrPct, vwAtr, vpData, macroData);
             document.getElementById('results').classList.remove("hidden");
             document.getElementById('aiSection').classList.remove("hidden");
-            status.innerText = `Đã tính toán xong dựa trên ${allData.length} nến chuẩn!`;
+            
+            // Xóa bộ đếm cũ (nếu có) và thiết lập tự động chạy lại sau 15 phút (900,000 mili-giây)
+            if (autoUpdateTimer) clearInterval(autoUpdateTimer);
+            autoUpdateTimer = setInterval(runAnalysis, 15 * 60 * 1000);
+
+            status.innerText = `Đã tính toán xong dựa trên ${allData.length} nến chuẩn! Sẽ tự động làm mới sau 15 phút...`;
             btn.disabled = false; btn.classList.remove("opacity-50");
         }
 
