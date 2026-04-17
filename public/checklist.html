@@ -210,12 +210,12 @@
 
             <div class="card p-6 rounded-xl flex flex-col justify-center border-t-2 border-gray-600 relative">
                 <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 text-center">Hướng Giá</h4>
-                <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-4 text-right">EMA (Giá) <span class="text-gray-600 px-1">|</span> VW-Price</div>
+                <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-4 text-right">Đơn thuần (SMA) <span class="text-gray-600 px-1">|</span> VW-Price</div>
                 
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm text-yellow-400">Ngắn hạn (B):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resEmaPriceDirB" class="text-lg font-bold quant-font">-</span>
+                        <span id="resSimplePriceB" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
                         <span id="resPriceDirB" class="text-lg font-bold quant-font">-</span>
                     </div>
@@ -223,7 +223,7 @@
                 <div class="flex justify-between items-center mb-2 bg-gray-800/50 p-1 rounded">
                     <span class="text-sm text-orange-300">Trung hạn (Dakj):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resEmaPriceDirDakj" class="text-lg font-bold quant-font">-</span>
+                        <span id="resSimplePriceDakj" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
                         <span id="resPriceDirDakj" class="text-lg font-bold quant-font">-</span>
                     </div>
@@ -231,7 +231,7 @@
                 <div class="flex justify-between items-center">
                     <span class="text-sm text-blue-400">Tổng (A + B):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resEmaPriceDirAll" class="text-lg font-bold quant-font">-</span>
+                        <span id="resSimplePriceAll" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
                         <span id="resPriceDirAll" class="text-lg font-bold quant-font">-</span>
                     </div>
@@ -550,10 +550,10 @@
             const emaB = calculateEMA(allData, lenB);
             const emaDakj = calculateEMA(allData, lenDakj);
 
-            // --- THAY THẾ SIMPLE PRICE DIR BẰNG EMA (CLOSE - OPEN) ---
-            const emaPriceDirB = calculateEMA(allData, lenB, d => d.close - d.open);
-            const emaPriceDirDakj = calculateEMA(allData, lenDakj, d => d.close - d.open);
-            const emaPriceDirAll = calculateEMA(allData, totalCandles, d => d.close - d.open);
+            // --- KHÔI PHỤC SMA (CLOSE - OPEN) CHO HƯỚNG GIÁ ĐƠN THUẦN ---
+            const simplePriceDirB = dataB.length > 0 ? dataB.reduce((sum, d) => sum + (d.close - d.open), 0) / dataB.length : 0;
+            const simplePriceDirDakj = dataDakj.length > 0 ? dataDakj.reduce((sum, d) => sum + (d.close - d.open), 0) / dataDakj.length : 0;
+            const simplePriceDirAll = allData.length > 0 ? allData.reduce((sum, d) => sum + (d.close - d.open), 0) / allData.length : 0;
 
             // --- TÍNH TOÁN VWAP VÀ VW-PRICE ---
             const vwapA = calculateVWAP(dataA); 
@@ -654,10 +654,10 @@
             setSubMetric('resPriceDirDakj', priceDirDakj);
             setSubMetric('resPriceDirAll', priceDirAll);
 
-            // In ra kết quả Hướng giá EMA
-            setSubMetric('resEmaPriceDirB', emaPriceDirB); 
-            setSubMetric('resEmaPriceDirDakj', emaPriceDirDakj);
-            setSubMetric('resEmaPriceDirAll', emaPriceDirAll);
+            // In ra kết quả Hướng giá Đơn thuần (SMA)
+            setSubMetric('resSimplePriceB', simplePriceDirB); 
+            setSubMetric('resSimplePriceDakj', simplePriceDirDakj);
+            setSubMetric('resSimplePriceAll', simplePriceDirAll);
             
             setSubMetric('resDeltaB', vwDeltaB); 
             setSubMetric('resDeltaDakj', vwDeltaDakj);
@@ -666,8 +666,8 @@
             document.getElementById('resVwAtr').innerText = formatNumber(vwAtr, false);
             document.getElementById('resVwAtrPct').innerText = "(" + formatNumber(vwAtrPct, true) + "%)";
 
-            // GENERATE PROMPT VỚI CÁC BIẾN EMA MỚI
-            generateAIPrompt(symbol, timeframe, lenA, lenB, lenDakj, currentPrice, vwapA, vwapB, vwapDakj, emaA, emaB, emaDakj, rvolA, rvolDakj, volAccel, priceDirB, priceDirDakj, priceDirAll, emaPriceDirB, emaPriceDirDakj, emaPriceDirAll, vwDeltaB, vwDeltaDakj, vwDeltaAll, vwAtrPct, vwAtr, vpData, macroData);
+            // GENERATE PROMPT
+            generateAIPrompt(symbol, timeframe, lenA, lenB, lenDakj, currentPrice, vwapA, vwapB, vwapDakj, emaA, emaB, emaDakj, rvolA, rvolDakj, volAccel, priceDirB, priceDirDakj, priceDirAll, simplePriceDirB, simplePriceDirDakj, simplePriceDirAll, vwDeltaB, vwDeltaDakj, vwDeltaAll, vwAtrPct, vwAtr, vpData, macroData);
             
             document.getElementById('results').classList.remove("hidden");
             document.getElementById('aiSection').classList.remove("hidden");
@@ -680,7 +680,7 @@
             btn.disabled = false; btn.classList.remove("opacity-50");
         }
 
-        function generateAIPrompt(symbol, tf, lenA, lenB, lenDakj, price, vA, vB, vDakj, emaA, emaB, emaDakj, rvolA, rvolDakj, accel, pDirB, pDirDakj, pDirAll, emaPB, emaPDakj, emaPAll, dDirB, dDirDakj, dDirAll, atrPct, atr, vpData, macroData) {
+        function generateAIPrompt(symbol, tf, lenA, lenB, lenDakj, price, vA, vB, vDakj, emaA, emaB, emaDakj, rvolA, rvolDakj, accel, pDirB, pDirDakj, pDirAll, simplePB, simplePDakj, simplePAll, dDirB, dDirDakj, dDirAll, atrPct, atr, vpData, macroData) {
             const now = new Date();
             const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
             const dayOfWeek = days[now.getDay()];
@@ -710,13 +710,13 @@ ${macroText}
 * Động lượng vs Trọng tâm Ngắn hạn (EMA | VWAP B): ${formatNumber(emaB)} | ${formatNumber(vB)}
 * RVOL (B/Dakj | B/A): ${formatNumber(rvolDakj, true)} | ${formatNumber(rvolA, true)}
 * Gia tốc Volume: ${formatNumber(accel, true)}
-* Hướng Giá (EMA Close-Open) | VW-Price (Ngắn hạn B): ${formatNumber(emaPB)} | ${formatNumber(pDirB)}
+* Hướng Giá Đơn thuần | VW-Price (Ngắn hạn B): ${formatNumber(simplePB)} | ${formatNumber(pDirB)}
 * Hướng Delta (Ngắn hạn B): ${formatNumber(dDirB)} (Nỗ lực Mua/Bán chủ động)
 
 [YÊU CẦU PHÂN TÍCH CHUYÊN SÂU]
 1. RVOL & Dòng tiền: RVOL (B/Dakj) có cho thấy sự bùng nổ thanh khoản không, hay đang ở trạng thái "No Demand / No Supply"? 
 2. EMA vs VWAP (Động lượng và Điểm neo): Ở cửa sổ Ngắn hạn và Trung hạn, Động lượng (EMA) đang chạy trước hay đã bị hút ngược về Trọng tâm (VWAP)? Kết hợp với Vĩ mô bơm/rút tiền, nhịp này là Breakout thật hay bẫy (Fake-out)?
-3. Luật Nỗ lực - Kết quả (Wyckoff): Đối chiếu Hướng Delta (Nỗ lực chủ động) với Phân kỳ Hướng Giá EMA & VW-Price. Có hiện tượng Hấp thụ Cầu/Cung (Absorption) hoặc Spoofing ở đây không? 
+3. Luật Nỗ lực - Kết quả (Wyckoff): Đối chiếu Hướng Delta (Nỗ lực chủ động) với Phân kỳ Hướng Giá Đơn thuần & VW-Price. Có hiện tượng Hấp thụ Cầu/Cung (Absorption) hoặc Spoofing ở đây không? 
 4. Kịch bản Trading: Đưa ra chiến lược hành động cụ thể. Ưu tiên tìm vùng săn Stop-loss (Liquidity Sweep) tại các mốc VWAP hoặc POC.`;
 
             document.getElementById('aiPromptOutput').value = promptText;
