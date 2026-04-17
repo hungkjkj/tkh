@@ -179,13 +179,13 @@
             </div>
             
             <div class="card p-6 rounded-xl flex flex-col justify-center border-t-2 border-gray-600 relative">
-                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 text-center">Đường Trung Bình</h4>
-                <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-4 text-right">SMA <span class="text-gray-600 px-1">|</span> VWAP</div>
+                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 text-center">Động Lượng vs Trọng Tâm</h4>
+                <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-4 text-right">EMA <span class="text-gray-600 px-1">|</span> VWAP</div>
                 
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm text-yellow-400">Ngắn hạn (B):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resSmaB" class="text-lg font-bold quant-font">-</span>
+                        <span id="resEmaB" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
                         <span id="resVwapB" class="text-lg font-bold quant-font">-</span>
                     </div>
@@ -193,7 +193,7 @@
                 <div class="flex justify-between items-center mb-2 bg-gray-800/50 p-1 rounded">
                     <span class="text-sm text-orange-300">Trung hạn (Dakj):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resSmaDakj" class="text-lg font-bold quant-font">-</span>
+                        <span id="resEmaDakj" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
                         <span id="resVwapDakj" class="text-lg font-bold quant-font">-</span>
                     </div>
@@ -201,7 +201,7 @@
                 <div class="flex justify-between items-center">
                     <span class="text-sm text-blue-400">Dài hạn (A):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resSmaA" class="text-lg font-bold quant-font">-</span>
+                        <span id="resEmaA" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
                         <span id="resVwapA" class="text-lg font-bold quant-font">-</span>
                     </div>
@@ -210,12 +210,12 @@
 
             <div class="card p-6 rounded-xl flex flex-col justify-center border-t-2 border-gray-600 relative">
                 <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 text-center">Hướng Giá</h4>
-                <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-4 text-right">Đơn thuần <span class="text-gray-600 px-1">|</span> VW-Price</div>
+                <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-4 text-right">EMA (Giá) <span class="text-gray-600 px-1">|</span> VW-Price</div>
                 
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm text-yellow-400">Ngắn hạn (B):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resSimplePriceB" class="text-lg font-bold quant-font">-</span>
+                        <span id="resEmaPriceDirB" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
                         <span id="resPriceDirB" class="text-lg font-bold quant-font">-</span>
                     </div>
@@ -223,7 +223,7 @@
                 <div class="flex justify-between items-center mb-2 bg-gray-800/50 p-1 rounded">
                     <span class="text-sm text-orange-300">Trung hạn (Dakj):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resSimplePriceDakj" class="text-lg font-bold quant-font">-</span>
+                        <span id="resEmaPriceDirDakj" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
                         <span id="resPriceDirDakj" class="text-lg font-bold quant-font">-</span>
                     </div>
@@ -231,7 +231,7 @@
                 <div class="flex justify-between items-center">
                     <span class="text-sm text-blue-400">Tổng (A + B):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resSimplePriceAll" class="text-lg font-bold quant-font">-</span>
+                        <span id="resEmaPriceDirAll" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
                         <span id="resPriceDirAll" class="text-lg font-bold quant-font">-</span>
                     </div>
@@ -254,7 +254,9 @@
                 </div>
             </div>
             
-        </div> <div id="aiSection" class="mt-8 hidden">
+        </div> 
+
+        <div id="aiSection" class="mt-8 hidden">
             <div class="card p-6 rounded-xl border border-purple-500/30 relative">
                 <div class="flex justify-between items-center mb-4">
                     <div class="flex items-center gap-3">
@@ -303,26 +305,20 @@
                 const response = await fetch('https://stablecoins.llama.fi/stablecoincharts/all');
                 const data = await response.json();
                 
-                // Cần ít nhất 15 ngày dữ liệu để tính EMA 7 mượt mà
                 if (data && data.length >= 15) {
-                    // Cắt lấy 15 ngày gần nhất
                     const recentData = data.slice(-15);
                     let deltas = [];
                     
-                    // Tính Delta (Tiền ròng bơm/rút) của từng ngày
                     for (let i = 1; i < recentData.length; i++) {
                         const dailyDelta = recentData[i].totalCirculatingUSD.peggedUSD - recentData[i-1].totalCirculatingUSD.peggedUSD;
                         deltas.push(dailyDelta);
                     }
 
-                    // Tính EMA 7 cho chuỗi Delta (K = 2 / (N + 1) = 0.25)
                     const N = 7;
                     const k = 2 / (N + 1);
                     
-                    // Lấy SMA của phần đầu làm giá trị khởi tạo cho EMA
                     let ema = deltas.slice(0, N).reduce((a, b) => a + b, 0) / N;
                     
-                    // Tính đuổi EMA cho các ngày tiếp theo
                     for (let i = N; i < deltas.length; i++) {
                         ema = (deltas[i] * k) + (ema * (1 - k));
                     }
@@ -338,7 +334,7 @@
             }
         }
 
-        // --- FETCH BINANCE K LINES CÓ PHÂN TRANG LÙI QUÁ KHỨ ---
+        // --- FETCH BINANCE K LINES CÓ PHÂN TRANG ---
         async function fetchBinanceDataByLimit(symbol, timeframe, limit) {
             const formattedSymbol = symbol.replace('/', '').toUpperCase();
             const apiSymbol = formattedSymbol.replace('/', '');
@@ -349,18 +345,10 @@
             try {
                 while (remaining > 0) {
                     const fetchCount = Math.min(remaining, 1000);
-                    const params = {
-                        symbol: apiSymbol,
-                        interval: timeframe,
-                        limit: fetchCount
-                    };
-                    
-                    if (currentEndTime) {
-                        params.endTime = currentEndTime;
-                    }
+                    const params = { symbol: apiSymbol, interval: timeframe, limit: fetchCount };
+                    if (currentEndTime) params.endTime = currentEndTime;
 
                     const response = await exchange.publicGetKlines(params);
-                    
                     if (!response || response.length === 0) break;
 
                     allData = response.concat(allData);
@@ -368,7 +356,7 @@
                     currentEndTime = parseInt(response[0][0]) - 1;
 
                     if (remaining > 0) {
-                        await new Promise(resolve => setTimeout(resolve, 100)); // Delay 100ms tránh Rate Limit
+                        await new Promise(resolve => setTimeout(resolve, 100));
                     }
                 }
 
@@ -384,7 +372,7 @@
                 }));
             } catch (e) {
                 console.error("Fetch Error:", e);
-                alert("Lỗi tải dữ liệu Binance. Có thể do đứt kết nối hoặc quá giới hạn API."); 
+                alert("Lỗi tải dữ liệu Binance."); 
                 return [];
             }
         }
@@ -397,6 +385,17 @@
                 cumVol += d.volume; cumVolPrice += typicalPrice * d.volume;
             });
             return cumVol === 0 ? 0 : cumVolPrice / cumVol;
+        }
+
+        // CÔNG THỨC EMA ĐA NĂNG (MẶC ĐỊNH LÀ GIÁ CLOSE, CÓ THỂ EXTRACT)
+        function calculateEMA(data, period, extractor = d => d.close) {
+            if (!data || data.length === 0 || period <= 0) return 0;
+            const k = 2 / (period + 1);
+            let ema = extractor(data[0]); // Giá trị neo khởi tạo
+            for (let i = 1; i < data.length; i++) {
+                ema = (extractor(data[i]) * k) + (ema * (1 - k));
+            }
+            return ema;
         }
 
         function calculateDynamicVolumeProfile(data, currentPrice, numBins = 100) {
@@ -518,7 +517,6 @@
             status.innerText = `Đang tải On-chain & ${totalCandles} nến...`;
             btn.disabled = true; btn.classList.add("opacity-50");
 
-            // Gọi API song song (Binance + DefiLlama)
             const [rawData, macroData] = await Promise.all([
                 fetchBinanceDataByLimit(symbol, timeframe, totalCandles + 1),
                 fetchStablecoinMacro()
@@ -535,26 +533,33 @@
             const ticker = await exchange.fetchTicker(symbol.replace('/', '').toUpperCase());
             const currentPrice = ticker.last;
 
-            // --- TÍNH TOÁN CỬA SỔ A & DAKJ & B ---
+            // --- TÍNH TOÁN RVOL ---
             const avgVolA = dataA.length > 0 ? dataA.reduce((sum, d) => sum + d.volume, 0) / dataA.length : 0;
             const avgVolB = dataB.length > 0 ? dataB.reduce((sum, d) => sum + d.volume, 0) / dataB.length : 0;
             const avgVolDakj = dataDakj.length > 0 ? dataDakj.reduce((sum, d) => sum + d.volume, 0) / dataDakj.length : 0;
             
-            const rvolA = avgVolA === 0 ? 0 : avgVolB / avgVolA; // So với Dài hạn
-            const rvolDakj = avgVolDakj === 0 ? 0 : avgVolB / avgVolDakj; // So với Trung hạn (Dòng tiền trong ngày)
+            const rvolA = avgVolA === 0 ? 0 : avgVolB / avgVolA; 
+            const rvolDakj = avgVolDakj === 0 ? 0 : avgVolB / avgVolDakj; 
 
             const sumVolB = dataB.reduce((sum, d) => sum + d.volume, 0);
             const sumVolLastNofA = dataA.slice(-dataB.length).reduce((sum, d) => sum + d.volume, 0);
             const volAccel = sumVolLastNofA === 0 ? 0 : sumVolB / sumVolLastNofA;
 
-            const vwapA = calculateVWAP(dataA); 
-            const smaA = dataA.length > 0 ? dataA.reduce((sum, d) => sum + d.close, 0) / dataA.length : 0;
-            
-            const vwapB = calculateVWAP(dataB);
-            const smaB = dataB.length > 0 ? dataB.reduce((sum, d) => sum + d.close, 0) / dataB.length : 0;
+            // --- THAY THẾ SMA BẰNG EMA CHO GIÁ ---
+            const emaA = calculateEMA(allData, lenA);
+            const emaB = calculateEMA(allData, lenB);
+            const emaDakj = calculateEMA(allData, lenDakj);
 
-            const simplePriceDirB = dataB.length > 0 ? dataB.reduce((sum, d) => sum + (d.close - d.open), 0) / dataB.length : 0;
-            
+            // --- THAY THẾ SIMPLE PRICE DIR BẰNG EMA (CLOSE - OPEN) ---
+            const emaPriceDirB = calculateEMA(allData, lenB, d => d.close - d.open);
+            const emaPriceDirDakj = calculateEMA(allData, lenDakj, d => d.close - d.open);
+            const emaPriceDirAll = calculateEMA(allData, totalCandles, d => d.close - d.open);
+
+            // --- TÍNH TOÁN VWAP VÀ VW-PRICE ---
+            const vwapA = calculateVWAP(dataA); 
+            const vwapB = calculateVWAP(dataB);
+            const vwapDakj = calculateVWAP(dataDakj);
+
             let sumWdB_num = 0, sumWdB_den = 0, weightedPriceMoveB = 0;
             dataB.forEach(d => {
                 const delta = d.buyVolume - d.sellVolume;
@@ -564,24 +569,14 @@
             const vwDeltaB = sumWdB_den === 0 ? 0 : (sumWdB_num / sumWdB_den);
             const priceDirB = sumWdB_den === 0 ? 0 : (weightedPriceMoveB / sumWdB_den);
 
-            // --- TÍNH TOÁN CỬA SỔ DAKJ ---
-            const vwapDakj = calculateVWAP(dataDakj);
-            const smaDakj = dataDakj.length > 0 ? dataDakj.reduce((sum, d) => sum + d.close, 0) / dataDakj.length : 0;
-            
-            const simplePriceDirDakj = dataDakj.length > 0 ? dataDakj.reduce((sum, d) => sum + (d.close - d.open), 0) / dataDakj.length : 0;
-
             let sumWdDakj_num = 0, sumWdDakj_den = 0, weightedPriceMoveDakj = 0;
             dataDakj.forEach(d => {
                 const delta = d.buyVolume - d.sellVolume;
-                sumWdDakj_num += (delta * d.volume); 
-                sumWdDakj_den += d.volume;
+                sumWdDakj_num += (delta * d.volume); sumWdDakj_den += d.volume;
                 weightedPriceMoveDakj += (d.close - d.open) * d.volume;
             });
             const vwDeltaDakj = sumWdDakj_den === 0 ? 0 : (sumWdDakj_num / sumWdDakj_den);
             const priceDirDakj = sumWdDakj_den === 0 ? 0 : (weightedPriceMoveDakj / sumWdDakj_den);
-
-            // --- TÍNH TOÁN TỔNG (ALL) ---
-            const simplePriceDirAll = allData.length > 0 ? allData.reduce((sum, d) => sum + (d.close - d.open), 0) / allData.length : 0;
 
             let totalVolCombined = 0, weightedPriceMoveAll = 0, sumWdAll_num = 0, cumWeightedTR = 0;
             for (let i = 0; i < allData.length; i++) {
@@ -600,27 +595,23 @@
 
             const vpData = calculateDynamicVolumeProfile(allData, currentPrice, 100);
 
-            // UI UPDATES
+            // --- UI UPDATES ---
             updateCurrentPriceDisplay(currentPrice); 
             
-            // Cập nhật thẻ Macro On-Chain (EMA Delta)
             let macroMcapText = "N/A", macroStatusText = "Không có dữ liệu", macroStatusClass = "bg-gray-500/20 text-gray-400 border border-gray-500/30";
             if (macroData) {
                 macroMcapText = formatLargeCurrency(macroData.mcap);
-                
                 const isPositive = macroData.emaDelta > 0;
                 const emaDeltaEl = document.getElementById('resEmaDelta');
                 
-                // Hiển thị EMA Delta dưới dạng số Tỷ/Triệu USD
                 let formattedEma = formatLargeCurrency(Math.abs(macroData.emaDelta));
                 emaDeltaEl.innerText = (isPositive ? "+" : "-") + formattedEma + "/ngày";
                 emaDeltaEl.className = "text-2xl font-bold quant-font " + (isPositive ? "text-green-500" : "text-red-500");
                 
-                // Logic Phân tích trạng thái bồn chứa
-                if (macroData.emaDelta > 50000000) { // Bơm ròng trên 50tr USD/ngày (đã làm mượt)
+                if (macroData.emaDelta > 50000000) { 
                     macroStatusText = "Gia tốc Bơm Tiền Mạnh 🌊";
                     macroStatusClass = "bg-green-500/20 text-green-400 border border-green-500/30";
-                } else if (macroData.emaDelta < -50000000) { // Rút ròng
+                } else if (macroData.emaDelta < -50000000) { 
                     macroStatusText = "Gia tốc Rút Tiền Mạnh 🩸";
                     macroStatusClass = "bg-red-500/20 text-red-400 border border-red-500/30";
                 } else {
@@ -645,28 +636,28 @@
                 pocStatusEl.className = "text-sm font-bold quant-font px-3 py-1 rounded w-fit bg-red-500/20 text-red-400 border border-red-500/30";
             }
 
-            // Cập nhật RVOL B/Dakj
             const rvolDakjEl = document.getElementById('resRvolDakj');
             rvolDakjEl.innerText = formatNumber(rvolDakj, true);
             rvolDakjEl.className = "text-3xl font-bold quant-font " + (rvolDakj > 1 ? "text-green-500" : (rvolDakj < 1 ? "text-red-500" : "text-gray-400"));
 
-            // Cập nhật RVOL B/A
             const rvolAEl = document.getElementById('resRvolA');
             rvolAEl.innerText = formatNumber(rvolA, true);
             rvolAEl.className = "text-3xl font-bold quant-font " + (rvolA > 1 ? "text-green-500" : (rvolA < 1 ? "text-red-500" : "text-gray-400"));
             updateMainRatio('resVolAccel', volAccel, volAccel > 1 ? "🚀 " : "🐢 ");
             
-            setCompareColor('resSmaA', smaA, 'resVwapA', vwapA);
-            setCompareColor('resSmaB', smaB, 'resVwapB', vwapB);
-            setCompareColor('resSmaDakj', smaDakj, 'resVwapDakj', vwapDakj);
+            // So sánh EMA và VWAP
+            setCompareColor('resEmaA', emaA, 'resVwapA', vwapA);
+            setCompareColor('resEmaB', emaB, 'resVwapB', vwapB);
+            setCompareColor('resEmaDakj', emaDakj, 'resVwapDakj', vwapDakj);
             
             setSubMetric('resPriceDirB', priceDirB); 
             setSubMetric('resPriceDirDakj', priceDirDakj);
             setSubMetric('resPriceDirAll', priceDirAll);
 
-            setSubMetric('resSimplePriceB', simplePriceDirB); 
-            setSubMetric('resSimplePriceDakj', simplePriceDirDakj);
-            setSubMetric('resSimplePriceAll', simplePriceDirAll);
+            // In ra kết quả Hướng giá EMA
+            setSubMetric('resEmaPriceDirB', emaPriceDirB); 
+            setSubMetric('resEmaPriceDirDakj', emaPriceDirDakj);
+            setSubMetric('resEmaPriceDirAll', emaPriceDirAll);
             
             setSubMetric('resDeltaB', vwDeltaB); 
             setSubMetric('resDeltaDakj', vwDeltaDakj);
@@ -675,20 +666,21 @@
             document.getElementById('resVwAtr').innerText = formatNumber(vwAtr, false);
             document.getElementById('resVwAtrPct').innerText = "(" + formatNumber(vwAtrPct, true) + "%)";
 
-            // GENERATE PROMPT
-            generateAIPrompt(symbol, timeframe, lenA, lenB, lenDakj, currentPrice, vwapA, vwapB, vwapDakj, smaA, smaB, smaDakj, rvolA, rvolDakj, volAccel, priceDirB, priceDirDakj, priceDirAll, simplePriceDirB, simplePriceDirDakj, simplePriceDirAll, vwDeltaB, vwDeltaDakj, vwDeltaAll, vwAtrPct, vwAtr, vpData, macroData);
+            // GENERATE PROMPT VỚI CÁC BIẾN EMA MỚI
+            generateAIPrompt(symbol, timeframe, lenA, lenB, lenDakj, currentPrice, vwapA, vwapB, vwapDakj, emaA, emaB, emaDakj, rvolA, rvolDakj, volAccel, priceDirB, priceDirDakj, priceDirAll, emaPriceDirB, emaPriceDirDakj, emaPriceDirAll, vwDeltaB, vwDeltaDakj, vwDeltaAll, vwAtrPct, vwAtr, vpData, macroData);
+            
             document.getElementById('results').classList.remove("hidden");
             document.getElementById('aiSection').classList.remove("hidden");
             
-            // Xóa bộ đếm cũ (nếu có) và thiết lập tự động chạy lại sau 15 phút (900,000 mili-giây)
+            // Auto Update 15 mins
             if (autoUpdateTimer) clearInterval(autoUpdateTimer);
             autoUpdateTimer = setInterval(runAnalysis, 15 * 60 * 1000);
 
-            status.innerText = `Đã tính toán xong dựa trên ${allData.length} nến chuẩn! Sẽ tự động làm mới sau 15 phút...`;
+            status.innerText = `Đã tính toán xong bằng bộ lọc EMA! Sẽ tự động làm mới sau 15 phút...`;
             btn.disabled = false; btn.classList.remove("opacity-50");
         }
 
-        function generateAIPrompt(symbol, tf, lenA, lenB, lenDakj, price, vA, vB, vDakj, sA, sB, sDakj, rvolA, rvolDakj, accel, pDirB, pDirDakj, pDirAll, simplePB, simplePDakj, simplePAll, dDirB, dDirDakj, dDirAll, atrPct, atr, vpData, macroData) {
+        function generateAIPrompt(symbol, tf, lenA, lenB, lenDakj, price, vA, vB, vDakj, emaA, emaB, emaDakj, rvolA, rvolDakj, accel, pDirB, pDirDakj, pDirAll, emaPB, emaPDakj, emaPAll, dDirB, dDirDakj, dDirAll, atrPct, atr, vpData, macroData) {
             const now = new Date();
             const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
             const dayOfWeek = days[now.getDay()];
@@ -713,19 +705,19 @@ ${macroText}
 [DỮ LIỆU ĐỊNH LƯỢNG MỚI NHẤT (${symbol} - Khung ${tf})]
 * Giá hiện tại: ${formatNumber(price)}
 * Trọng tâm khối lượng (POC): ${formatNumber(vpData.pocPrice)} (Giá bao phủ ${formatNumber(vpData.vaPercent, true)}% và ${pocStatusText})
-* Trung bình (SMA | VWAP) Dài hạn (A): ${formatNumber(sA)} | ${formatNumber(vA)}
-* Trung bình (SMA | VWAP) Trung hạn (Dakj): ${formatNumber(sDakj)} | ${formatNumber(vDakj)}
-* Trung bình (SMA | VWAP) Ngắn hạn (B): ${formatNumber(sB)} | ${formatNumber(vB)}
-* RVOL (B/Dakj | B/A): ${formatNumber(rvolDakj, true)} | ${formatNumber(rvolA, true)} (Chú ý độ lệch động lượng dòng tiền)
+* Động lượng vs Trọng tâm Dài hạn (EMA | VWAP A): ${formatNumber(emaA)} | ${formatNumber(vA)}
+* Động lượng vs Trọng tâm Trung hạn (EMA | VWAP Dakj): ${formatNumber(emaDakj)} | ${formatNumber(vDakj)}
+* Động lượng vs Trọng tâm Ngắn hạn (EMA | VWAP B): ${formatNumber(emaB)} | ${formatNumber(vB)}
+* RVOL (B/Dakj | B/A): ${formatNumber(rvolDakj, true)} | ${formatNumber(rvolA, true)}
 * Gia tốc Volume: ${formatNumber(accel, true)}
-* Hướng Giá Đơn thuần | VW-Price (Ngắn hạn B): ${formatNumber(simplePB)} | ${formatNumber(pDirB)}
+* Hướng Giá (EMA Close-Open) | VW-Price (Ngắn hạn B): ${formatNumber(emaPB)} | ${formatNumber(pDirB)}
 * Hướng Delta (Ngắn hạn B): ${formatNumber(dDirB)} (Nỗ lực Mua/Bán chủ động)
 
 [YÊU CẦU PHÂN TÍCH CHUYÊN SÂU]
 1. RVOL & Dòng tiền: RVOL (B/Dakj) có cho thấy sự bùng nổ thanh khoản không, hay đang ở trạng thái "No Demand / No Supply"? 
-2. Đánh giá Vĩ mô vs Vi mô: Động lượng bơm/rút tiền (EMA Delta) có đồng thuận với vị thế của VWAP so với SMA không? Đây là dòng tiền thật gom hàng hay chỉ là "Thanh khoản lối ra" (Exit Liquidity) của Cá mập?
-3. Luật Nỗ lực - Kết quả (Wyckoff): Đối chiếu Hướng Delta (Nỗ lực chủ động) với Phân kỳ Hướng Giá Đơn thuần & VW-Price. Có hiện tượng Hấp thụ Cầu (Absorption of Demand) hoặc Bẫy giá (Spoofing) ở đây không? Nhịp này đặc ruột hay rỗng ruột?
-4. Kịch bản Trading: Dựa trên cấu trúc trên, hãy đưa ra chiến lược cụ thể (Ưu tiên: Kịch bản rình mồi Liquidity Sweep tại các mốc VWAP). Nêu rõ điều kiện để kích hoạt lệnh Long/Short hoặc Quyết định Đứng ngoài (No Trade).`;
+2. EMA vs VWAP (Động lượng và Điểm neo): Ở cửa sổ Ngắn hạn và Trung hạn, Động lượng (EMA) đang chạy trước hay đã bị hút ngược về Trọng tâm (VWAP)? Kết hợp với Vĩ mô bơm/rút tiền, nhịp này là Breakout thật hay bẫy (Fake-out)?
+3. Luật Nỗ lực - Kết quả (Wyckoff): Đối chiếu Hướng Delta (Nỗ lực chủ động) với Phân kỳ Hướng Giá EMA & VW-Price. Có hiện tượng Hấp thụ Cầu/Cung (Absorption) hoặc Spoofing ở đây không? 
+4. Kịch bản Trading: Đưa ra chiến lược hành động cụ thể. Ưu tiên tìm vùng săn Stop-loss (Liquidity Sweep) tại các mốc VWAP hoặc POC.`;
 
             document.getElementById('aiPromptOutput').value = promptText;
             
