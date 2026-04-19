@@ -213,13 +213,13 @@
             </div>
             
             <div class="card p-6 rounded-xl flex flex-col justify-center border-t-2 border-gray-600 relative">
-                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 text-center">Động Lượng vs Trọng Tâm</h4>
-                <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-4 text-right">EMA <span class="text-gray-600 px-1">|</span> VWAP</div>
+                <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 text-center">Mặt Bằng Giá vs Trọng Tâm</h4>
+                <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-4 text-right">SMA <span class="text-gray-600 px-1">|</span> VWAP</div>
                 
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm text-yellow-400">Ngắn hạn (B):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resEmaB" class="text-lg font-bold quant-font">-</span>
+                        <span id="resSmaB" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
                         <span id="resVwapB" class="text-lg font-bold quant-font">-</span>
                     </div>
@@ -227,7 +227,7 @@
                 <div class="flex justify-between items-center mb-2 bg-gray-800/50 p-1 rounded">
                     <span class="text-sm text-orange-300">Trung hạn (Dakj):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resEmaDakj" class="text-lg font-bold quant-font">-</span>
+                        <span id="resSmaDakj" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
                         <span id="resVwapDakj" class="text-lg font-bold quant-font">-</span>
                     </div>
@@ -235,7 +235,7 @@
                 <div class="flex justify-between items-center">
                     <span class="text-sm text-blue-400">Dài hạn (A):</span>
                     <div class="flex items-center gap-2">
-                        <span id="resEmaA" class="text-lg font-bold quant-font">-</span>
+                        <span id="resSmaA" class="text-lg font-bold quant-font">-</span>
                         <span class="text-gray-600 text-sm">|</span>
                         <span id="resVwapA" class="text-lg font-bold quant-font">-</span>
                     </div>
@@ -422,6 +422,13 @@
             return ema;
         }
 
+        // --- Hàm mới: Tính SMA (Simple Moving Average) ---
+        function calculateSMA(data, period, extractor = d => d.close) {
+            if (!data || data.length === 0 || period <= 0) return 0;
+            const slice = data.slice(-Math.min(period, data.length));
+            return slice.reduce((sum, d) => sum + extractor(d), 0) / slice.length;
+        }
+
         function calculateDynamicVolumeProfile(data, currentPrice, numBins = 100) {
             if (data.length === 0) return { pocPrice: 0, vaPercent: 0, isAbovePoc: true };
             let minPrice = Math.min(...data.map(d => d.low));
@@ -558,10 +565,12 @@
             const sumVolLastNofA = dataA.slice(-dataB.length).reduce((sum, d) => sum + d.volume, 0);
             const volAccel = sumVolLastNofA === 0 ? 0 : sumVolB / sumVolLastNofA;
 
-            const emaA = calculateEMA(allData, lenA);
-            const emaB = calculateEMA(allData, lenB);
-            const emaDakj = calculateEMA(allData, lenDakj);
+            // SỬ DỤNG SMA CHO MẶT BẰNG GIÁ
+            const smaA = calculateSMA(allData, lenA);
+            const smaB = calculateSMA(allData, lenB);
+            const smaDakj = calculateSMA(allData, lenDakj);
 
+            // Giữ nguyên EMA cho động lượng giá (Trigger bóp cò)
             const emaPriceDirB = calculateEMA(allData, lenB, d => d.close - d.open);
 
             const simplePriceDirB = dataB.length > 0 ? dataB.reduce((sum, d) => sum + (d.close - d.open), 0) / dataB.length : 0;
@@ -616,7 +625,6 @@
             let isBearishAbsorption = false;
 
             // B1: Divergence (Nỗ lực Delta mạnh nhưng Kết quả Giá đứng yên hoặc đi ngược)
-            // Ngưỡng 0 được dùng cho sự phân kỳ tuyệt đối về dấu
             if (vwDeltaB < 0 && simplePriceDirB >= 0) {
                 trapContextText = "Hấp thụ CẦU (Bắt đáy)";
                 trapContextClass = "text-green-500";
@@ -637,7 +645,7 @@
                 retailClass = vwDeltaB > 0 ? "text-green-400" : "text-red-400";
             }
 
-            // B3: Trigger Bóp cò
+            // B3: Trigger Bóp cò (Dùng EMA Động lượng)
             let triggerText = "ĐỨNG NGOÀI QUAN SÁT";
             let triggerClass = "bg-gray-800 text-gray-400 border border-gray-600";
 
@@ -714,9 +722,10 @@
             rvolAEl.className = "text-3xl font-bold quant-font " + (rvolA > 1 ? "text-green-500" : (rvolA < 1 ? "text-red-500" : "text-gray-400"));
             updateMainRatio('resVolAccel', volAccel, volAccel > 1 ? "🚀 " : "🐢 ");
             
-            setCompareColor('resEmaA', emaA, 'resVwapA', vwapA);
-            setCompareColor('resEmaB', emaB, 'resVwapB', vwapB);
-            setCompareColor('resEmaDakj', emaDakj, 'resVwapDakj', vwapDakj);
+            // Cập nhật giao diện đối chiếu SMA và VWAP
+            setCompareColor('resSmaA', smaA, 'resVwapA', vwapA);
+            setCompareColor('resSmaB', smaB, 'resVwapB', vwapB);
+            setCompareColor('resSmaDakj', smaDakj, 'resVwapDakj', vwapDakj);
             
             setSubMetric('resPriceDirB', priceDirB); 
             setSubMetric('resPriceDirDakj', priceDirDakj);
@@ -733,7 +742,8 @@
             document.getElementById('resVwAtr').innerText = formatNumber(vwAtr, false);
             document.getElementById('resVwAtrPct').innerText = "(" + formatNumber(vwAtrPct, true) + "%)";
 
-            generateAIPrompt(symbol, timeframe, lenA, lenB, lenDakj, currentPrice, vwapA, vwapB, vwapDakj, emaA, emaB, emaDakj, rvolA, rvolDakj, volAccel, priceDirB, priceDirDakj, priceDirAll, simplePriceDirB, simplePriceDirDakj, simplePriceDirAll, vwDeltaB, vwDeltaDakj, vwDeltaAll, vwAtrPct, vwAtr, vpData, macroData);
+            // Truyền dữ liệu SMA vào hệ thống tạo Prompt AI
+            generateAIPrompt(symbol, timeframe, lenA, lenB, lenDakj, currentPrice, vwapA, vwapB, vwapDakj, smaA, smaB, smaDakj, rvolA, rvolDakj, volAccel, priceDirB, priceDirDakj, priceDirAll, simplePriceDirB, simplePriceDirDakj, simplePriceDirAll, vwDeltaB, vwDeltaDakj, vwDeltaAll, vwAtrPct, vwAtr, vpData, macroData);
             
             document.getElementById('results').classList.remove("hidden");
             document.getElementById('aiSection').classList.remove("hidden");
@@ -741,11 +751,11 @@
             if (autoUpdateTimer) clearInterval(autoUpdateTimer);
             autoUpdateTimer = setInterval(runAnalysis, 15 * 60 * 1000);
 
-            status.innerText = `Đã tính toán xong bằng bộ lọc EMA! Sẽ tự động làm mới sau 15 phút...`;
+            status.innerText = `Đã tính toán xong bằng bộ lọc SMA/VWAP! Sẽ tự động làm mới sau 15 phút...`;
             btn.disabled = false; btn.classList.remove("opacity-50");
         }
 
-        function generateAIPrompt(symbol, tf, lenA, lenB, lenDakj, price, vA, vB, vDakj, emaA, emaB, emaDakj, rvolA, rvolDakj, accel, pDirB, pDirDakj, pDirAll, simplePB, simplePDakj, simplePAll, dDirB, dDirDakj, dDirAll, atrPct, atr, vpData, macroData) {
+        function generateAIPrompt(symbol, tf, lenA, lenB, lenDakj, price, vA, vB, vDakj, smaA, smaB, smaDakj, rvolA, rvolDakj, accel, pDirB, pDirDakj, pDirAll, simplePB, simplePDakj, simplePAll, dDirB, dDirDakj, dDirAll, atrPct, atr, vpData, macroData) {
             const now = new Date();
             const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
             const dayOfWeek = days[now.getDay()];
@@ -770,15 +780,15 @@ ${macroText}
 [DỮ LIỆU ĐỊNH LƯỢNG MỚI NHẤT (${symbol} - Khung ${tf})]
 * Giá hiện tại: ${formatNumber(price)}
 * Trọng tâm khối lượng (POC): ${formatNumber(vpData.pocPrice)} (Giá bao phủ ${formatNumber(vpData.vaPercent, true)}% và ${pocStatusText})
-* Động lượng vs Trọng tâm Dài hạn (EMA | VWAP A): ${formatNumber(emaA)} | ${formatNumber(vA)}
-* Động lượng vs Trọng tâm Trung hạn (EMA | VWAP Dakj): ${formatNumber(emaDakj)} | ${formatNumber(vDakj)}
+* Mặt bằng giá vs Trọng tâm Dài hạn (SMA | VWAP A): ${formatNumber(smaA)} | ${formatNumber(vA)}
+* Mặt bằng giá vs Trọng tâm Trung hạn (SMA | VWAP Dakj): ${formatNumber(smaDakj)} | ${formatNumber(vDakj)}
 * RVOL (B/Dakj | B/A): ${formatNumber(rvolDakj, true)} | ${formatNumber(rvolA, true)}
 * Hướng Giá Đơn thuần (Result) | VW-Price (Ngắn hạn B): ${formatNumber(simplePB)} | ${formatNumber(pDirB)}
 * Hướng Delta (Effort) (Ngắn hạn B): ${formatNumber(dDirB)} (Nỗ lực Mua/Bán chủ động)
 
 [YÊU CẦU PHÂN TÍCH CHUYÊN SÂU]
 1. Đánh giá Bẫy Đám Đông (Retail Trap): Dựa trên RVOL (Thanh khoản) và mâu thuẫn giữa Hướng Delta (Effort) vs Hướng Giá Đơn Thuần (Result). Đám đông đang FOMO hay Panic Sell? Có sự kiện Hấp thụ (Absorption) xảy ra để bẫy họ không?
-2. EMA vs VWAP (Xác nhận Trigger): Nếu có bẫy, động lượng hiện tại (EMA) đã đổi chiều ngược lại để xác nhận phá bẫy chưa, hay giá vẫn đang lao theo hướng của đám đông?
+2. Định vị Sideway & Trend (SMA vs VWAP): Hiện tại Giá trị trung bình (SMA) đang nằm trên hay dưới Dòng tiền (VWAP)? Điều này báo hiệu phe nào đang kiểm soát vị thế (Tích lũy hay Phân phối ngầm)? 
 3. Kịch bản Trading: Chỉ rõ vùng entry, stop loss (SL đặt sau đuôi râu quét thanh khoản) và chia chốt lời theo công thức quản trị vốn. Nếu market đi thuận trend sạch (Không có phân kỳ), hãy báo ĐỨNG NGOÀI hoặc thuận theo.`;
 
             document.getElementById('aiPromptOutput').value = promptText;
